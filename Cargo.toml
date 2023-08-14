@@ -1,0 +1,11 @@
+[package]
+name = "keymui"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+iced = "0.9.0"
+km = {package = "keymeow", git = "https://github.com/semilin/keymeow"}
+kc = {package = "keycat", git = "https://github.com/semilin/keycat"}
