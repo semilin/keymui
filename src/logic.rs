@@ -19,6 +19,7 @@ impl Keymui {
                         continue
                     }
                     let md: km::MetricData = serde_json::from_str(&fs::read_to_string(path)?)?;
+                    let mc = MetricContext::from(md);
                     println!("success");
 		}
                 None => continue
