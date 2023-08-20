@@ -8,8 +8,8 @@ use crate::Keymui;
 impl Keymui {
     pub fn import_metrics(&mut self, dir: PathBuf) -> Result<()> {
 	let mut added = false;
-        for entry in fs::read_dir(dir).unwrap() {
-	    let entry = entry.unwrap();
+        for entry in fs::read_dir(dir)? {
+	    let entry = entry?;
 	    let path = entry.path();
 	    println!("{:?}", path.extension());
 
