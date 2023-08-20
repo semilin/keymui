@@ -86,6 +86,7 @@ impl Application for Keymui {
 	    base_dirs: BaseDirs::new().unwrap(),
 	    metric_contexts: HashMap::new(),
 	};
+	let _ = keymui.load_metrics();
 	keymui.filter_commands();
         (keymui,
          text_input::focus::<Message>(text_input::Id::new("cmd")))
@@ -154,7 +155,7 @@ impl Application for Keymui {
 		    .set_directory(self.base_dirs.home_dir())
 		    .pick_folder();
 		if let Some(dir) = dir {
-		    match self.import_metrics(dir) {
+		    match self.import_metrics(dir, true) {
 			Ok(_) => { self.notification = ("successfully imported metric data".to_string(), None) },
 			Err(e) => { self.notification = ("error importing metric data".to_string(), Some(e.to_string()))}
 		    };
