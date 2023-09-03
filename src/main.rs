@@ -6,8 +6,18 @@ use km::{MetricContext};
 use rfd::FileDialog;
 use std::collections::HashMap;
 use directories::BaseDirs;
-use fuzzy_matcher::FuzzyMatcher;
-use fuzzy_matcher::skim::SkimMatcherV2;
+
+pub fn linear_matches(src: &str, target: &str) -> bool {
+    if target.len() < src.len() {
+	return false;
+    }
+    for (a, b) in src.chars().zip(target.chars()) {
+	if a != b {
+	    return false;
+	}
+    }
+    true
+}
 
 pub enum UserArg {
     
@@ -46,11 +56,11 @@ impl Keymui {
 	}
     }
     pub fn filter_commands(&mut self) {
-	let matcher = SkimMatcherV2::default();
+	
 	self.command_suggestions = self.commands
 	    .iter()
 	    .enumerate()
-	    .filter_map(|(i, c)| if matcher.fuzzy_match(&c.name, &self.command_input).is_some() {
+	    .filter_map(|(i, c)| if linear_matches(&self.command_input, &c.name) {
 		Some(i)
 	    } else {
 		None
