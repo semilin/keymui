@@ -1,50 +1,141 @@
-use km::{self, MetricContext};
-use anyhow::{anyhow, Result};
-use std::fs::{self, File};
-use std::path::PathBuf;
-use std::ffi::OsStr;
 use crate::Keymui;
+use anyhow::{anyhow, Result};
+use kc::Corpus;
+use km::{self, MetricContext};
+use std::ffi::OsStr;
+use std::fs::{self, File};
+use std::io::Write;
+use std::path::PathBuf;
 
 impl Keymui {
-    pub fn load_metrics(&mut self) -> Result<()> {
-	let mdir = self.base_dirs.data_dir().join("keymeow").join("metrics");
-	fs::create_dir_all(mdir.clone())?;
-	self.import_metrics(mdir, false)
+    pub fn data_dir(&self) -> PathBuf {
+        self.base_dirs.data_dir().join("keymeow")
     }
-    
-    pub fn import_metrics(&mut self, dir: PathBuf, save: bool) -> Result<()> {
-	let mut added = false;
+
+    pub fn load_layouts(&mut self) -> Result<()> {
+        let ldir = self.data_dir().join("layouts");
+        fs::create_dir_all(&ldir)?;
+        for entry in fs::read_dir(ldir)? {
+            let path = entry?.path();
+            let s = fs::read_to_string(path)?;
+            let layout: km::LayoutData = serde_json::from_str(&s)?;
+            self.layouts
+                .insert(layout.name.clone().to_lowercase().replace(' ', "-"), layout);
+        }
+        Ok(())
+    }
+
+    pub fn import_corpus(&mut self, file: PathBuf) -> Result<()> {
+        let cdir = self.data_dir().join("corpora");
+        fs::create_dir_all(&cdir)?;
+
+        // TODO generalize
+        let mut char_list = "abcdefghijklmnopqrstuvwxyz"
+            .chars()
+            .map(|c| vec![c, c.to_uppercase().next().unwrap()])
+            .collect::<Vec<Vec<char>>>();
+        char_list.extend(vec![
+            vec![',', '<'],
+            vec!['.', '>'],
+            vec!['/', '?'],
+            vec!['\'', '"'],
+        ]);
+        let mut corpus = Corpus::with_char_list(char_list);
+
+        corpus.add_file(&file)?;
+
+        let text = serde_json::to_string(&corpus)?;
+        let mut new_path = cdir.join(file.file_stem().ok_or(anyhow!("couldn't get path stem"))?);
+        new_path.set_extension("json");
+        write!(File::create(new_path)?, "{}", text)?;
+        Ok(())
+    }
+
+    pub fn import_metrics(&mut self, dir: PathBuf) -> Result<()> {
+        let mut added = false;
         for entry in fs::read_dir(dir)? {
-	    let entry = entry?;
-	    let path = entry.path();
-	    println!("{:?}", path.extension());
+            let entry = entry?;
+            let path = entry.path();
+            println!("{:?}", path.extension());
 
-	    match path.extension() {
-		Some(ext) => {
-		    if ext != OsStr::new("json") {
-                        continue
+            match path.extension() {
+                Some(ext) => {
+                    if ext != OsStr::new("json") {
+                        continue;
                     }
-		    let name = path.file_stem().ok_or(anyhow!("couldn't get path stem"))?.to_string_lossy().to_string();
-		    let s = fs::read_to_string(path.clone())?;
-		    let md: km::MetricData = serde_json::from_str(&s)?;
-                    let mc = MetricContext::from(md);
-		    self.metric_contexts.insert(name, mc);
-		    added = true;
+                    let name = &path
+                        .file_stem()
+                        .ok_or(anyhow!("couldn't get path stem"))?
+                        .to_string_lossy()
+                        .to_string();
+                    self.metric_lists.insert(name.clone(), path.clone());
+                    added = true;
 
-		    if save {
-			let mdir = self.base_dirs.data_dir().join("keymeow").join("metrics");
-			let newpath = mdir.join(path.file_name().ok_or(anyhow!("couldn't get filename"))?);
-		    	fs::write(newpath, s)?;
-		    }
-		}
-                None => continue
-	    };
-	}
+                    let mdir = self.base_dirs.data_dir().join("keymeow").join("metrics");
+                    let newpath =
+                        mdir.join(path.file_name().ok_or(anyhow!("couldn't get filename"))?);
+                    let s = fs::read_to_string(&path)?;
+                    fs::write(newpath, s)?;
+                }
+                None => continue,
+            };
+        }
 
         if added {
-	    Ok(())
-	} else {
-	    Err(anyhow!("directory contained no metric files"))
-	}
+            Ok(())
+        } else {
+            Err(anyhow!("directory contained no metric files"))
+        }
+    }
+
+    pub fn set_corpus_list(&mut self) -> Result<()> {
+        let cdir = self.data_dir().join("corpora");
+        fs::create_dir_all(&cdir)?;
+
+        for entry in fs::read_dir(cdir)? {
+            let path = entry?.path();
+            let name = path
+                .file_stem()
+                .ok_or(anyhow!("couldn't get path stem"))?
+                .to_string_lossy()
+                .to_string();
+            self.corpora.insert(name, path);
+        }
+        Ok(())
+    }
+
+    pub fn load_data(&mut self) -> Option<()> {
+        let path = self.metric_lists.get(&self.current_metrics.clone()?)?;
+        let s = fs::read_to_string(path).ok()?;
+        let metrics: km::MetricData = serde_json::from_str(&s).ok()?;
+
+        let corpus = self.current_corpus.clone()?;
+        let path = self.corpora.get(&corpus)?;
+        let s = fs::read_to_string(path).ok()?;
+        let corpus: Corpus = serde_json::from_str(&s).ok()?;
+
+        self.metric_context = Some(MetricContext::new(
+            self.layouts.get(&self.current_layout.clone()?).clone()?,
+            metrics,
+            corpus,
+        ));
+
+        Some(())
+    }
+
+    pub fn set_metric_list(&mut self) -> Result<()> {
+        let mdir = self.data_dir().join("metrics");
+        fs::create_dir_all(&mdir)?;
+
+        for entry in fs::read_dir(mdir)? {
+            let path = entry?.path();
+            let name = path
+                .file_stem()
+                .ok_or(anyhow!("couldn't get path stem"))?
+                .to_string_lossy()
+                .to_string();
+            self.metric_lists.insert(name, path);
+        }
+        Ok(())
     }
 }
