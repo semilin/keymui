@@ -1,7 +1,9 @@
 mod logic;
 use directories::BaseDirs;
 use iced::widget::pane_grid::{self, Axis, PaneGrid};
-use iced::widget::{button, column, container, pick_list, responsive, row, text, text_input};
+use iced::widget::{
+    button, column, container, pick_list, responsive, row, scrollable, text, text_input,
+};
 use iced::{alignment, executor, Application, Command, Element, Length, Settings, Theme};
 use iced_aw::{modal, Card};
 use km::{LayoutData, MetricContext};
@@ -163,23 +165,51 @@ impl Application for Keymui {
                         )]
                         .into()
                     }
-                    PaneKind::Metrics => row![
-                        pick_list(
-                            self.metric_lists
-                                .keys()
-                                .map(|s| s.to_string())
-                                .collect::<Vec<String>>(),
-                            self.current_metrics.clone().map(|s| s),
-                            Message::ContextSelected
-                        ),
-                        pick_list(
-                            self.corpora
-                                .keys()
-                                .map(|s| s.to_string())
-                                .collect::<Vec<String>>(),
-                            self.current_corpus.clone().map(|s| s),
-                            Message::CorpusSelected
-                        )
+                    PaneKind::Metrics => column![
+                        row![
+                            pick_list(
+                                self.metric_lists
+                                    .keys()
+                                    .map(|s| s.to_string())
+                                    .collect::<Vec<String>>(),
+                                self.current_metrics.clone(),
+                                Message::ContextSelected
+                            )
+                            .width(Length::Fill),
+                            pick_list(
+                                self.corpora
+                                    .keys()
+                                    .map(|s| s.to_string())
+                                    .collect::<Vec<String>>(),
+                                self.current_corpus.clone(),
+                                Message::CorpusSelected
+                            )
+                            .width(Length::Fill),
+                        ],
+                        if let Some(context) = &self.metric_context {
+                            let char_count = context.analyzer.layouts[0]
+                                .total_char_count(&context.analyzer.corpus)
+                                as f32;
+                            scrollable(column(
+                                context
+                                    .metrics
+                                    .iter()
+                                    .enumerate()
+                                    .map(|(i, m)| {
+                                        Element::from(row![
+                                            text(m.name.clone()).width(Length::Fill),
+                                            text(format!(
+                                                "1/{:.0}",
+                                                1.0 / (context.analyzer.stats[i] / char_count)
+                                            ))
+                                            .width(Length::Fill)
+                                        ])
+                                    })
+                                    .collect(),
+                            ))
+                        } else {
+                            scrollable(text("no metrics available!"))
+                        }
                     ]
                     .spacing(5)
                     .into(),
@@ -316,6 +346,7 @@ impl Application for Keymui {
             }
             Message::ContextSelected(s) => {
                 self.current_metrics = Some(s);
+                self.load_data();
             }
             Message::CorpusSelected(s) => {
                 self.current_corpus = Some(s);
