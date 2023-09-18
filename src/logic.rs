@@ -1,3 +1,4 @@
+use crate::layout_display::LayoutDisplay;
 use crate::Keymui;
 use anyhow::{anyhow, Result};
 use kc::Corpus;
@@ -39,6 +40,7 @@ impl Keymui {
             vec!['.', '>'],
             vec!['/', '?'],
             vec!['\'', '"'],
+            vec![';', ':'],
         ]);
         let mut corpus = Corpus::with_char_list(char_list);
 
@@ -114,11 +116,15 @@ impl Keymui {
         let s = fs::read_to_string(path).ok()?;
         let corpus: Corpus = serde_json::from_str(&s).ok()?;
 
-        self.metric_context = Some(MetricContext::new(
-            self.layouts.get(&self.current_layout.clone()?).clone()?,
+        let context = MetricContext::new(
+            self.layouts.get(&self.current_layout.clone()?)?,
             metrics,
             corpus,
-        ));
+        );
+
+        self.layout_display = Some(LayoutDisplay::new(&context));
+
+        self.metric_context = Some(context);
 
         Some(())
     }

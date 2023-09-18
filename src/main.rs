@@ -1,12 +1,14 @@
+mod layout_display;
 mod logic;
 use directories::BaseDirs;
 use iced::widget::pane_grid::{self, Axis, PaneGrid};
 use iced::widget::{
-    button, column, container, pick_list, responsive, row, scrollable, text, text_input,
+    button, column, container, pick_list, responsive, row, scrollable, text, text_input, Canvas,
 };
 use iced::{alignment, executor, Application, Command, Element, Length, Settings, Theme};
 use iced_aw::{modal, Card};
 use km::{LayoutData, MetricContext};
+use layout_display::LayoutDisplay;
 use rfd::FileDialog;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -48,6 +50,7 @@ pub struct Keymui {
     current_layout: Option<String>,
     current_metrics: Option<String>,
     current_corpus: Option<String>,
+    layout_display: Option<LayoutDisplay>,
     base_dirs: BaseDirs,
 
     metric_context: Option<MetricContext>,
@@ -58,11 +61,7 @@ pub struct Keymui {
 
 impl Keymui {
     pub fn parse_command(&mut self) {
-        let command = self
-            .commands
-            .iter()
-            .filter(|c| c.name == self.command_input)
-            .next();
+        let command = self.commands.iter().find(|c| c.name == self.command_input);
         if let Some(cmd) = command {
             let _ = self.update(cmd.message.clone());
             self.command_input = String::new();
@@ -121,6 +120,7 @@ impl Application for Keymui {
             commands,
             command_input: "".to_string(),
             command_suggestions: vec![],
+            layout_display: None,
             current_layout: None,
             current_metrics: None,
             current_corpus: None,
@@ -130,7 +130,10 @@ impl Application for Keymui {
             layouts: HashMap::new(),
             corpora: HashMap::new(),
         };
-        let _ = keymui.load_layouts();
+        let e = keymui.load_layouts();
+        if let Err(e) = e {
+            println!("{:?}", e);
+        }
         let _ = keymui.set_corpus_list();
         let _ = keymui.set_metric_list();
         keymui.current_layout = keymui.layouts.keys().next().cloned();
@@ -155,36 +158,50 @@ impl Application for Keymui {
                 match pane.kind {
                     PaneKind::Layout => {
                         // Layout view
-                        row![pick_list(
-                            self.layouts
-                                .keys()
-                                .map(|l| l.to_string())
-                                .collect::<Vec<String>>(),
-                            self.current_layout.clone().map(|s| s),
-                            Message::LayoutSelected
-                        )]
+                        column![
+                            pick_list(
+                                self.layouts
+                                    .keys()
+                                    .map(|l| l.to_string())
+                                    .collect::<Vec<String>>(),
+                                self.current_layout.clone(),
+                                Message::LayoutSelected
+                            ),
+                            if let Some(display) = &self.layout_display {
+                                container(
+                                    Canvas::new(display)
+                                        .width(Length::Fill)
+                                        .height(Length::Fill),
+                                )
+                                .width(Length::Fill)
+                                .height(Length::Fill)
+                                .padding(10)
+                            } else {
+                                container("no layout display available")
+                            }
+                        ]
                         .into()
                     }
                     PaneKind::Metrics => column![
                         row![
-                            pick_list(
+                            container(pick_list(
                                 self.metric_lists
                                     .keys()
                                     .map(|s| s.to_string())
                                     .collect::<Vec<String>>(),
                                 self.current_metrics.clone(),
                                 Message::ContextSelected
-                            )
-                            .width(Length::Fill),
-                            pick_list(
+                            ))
+                            .width(Length::FillPortion(3)),
+                            container(pick_list(
                                 self.corpora
                                     .keys()
                                     .map(|s| s.to_string())
                                     .collect::<Vec<String>>(),
                                 self.current_corpus.clone(),
                                 Message::CorpusSelected
-                            )
-                            .width(Length::Fill),
+                            ))
+                            .width(Length::FillPortion(1)),
                         ],
                         if let Some(context) = &self.metric_context {
                             let char_count = context.analyzer.layouts[0]
@@ -197,12 +214,13 @@ impl Application for Keymui {
                                     .enumerate()
                                     .map(|(i, m)| {
                                         Element::from(row![
-                                            text(m.name.clone()).width(Length::Fill),
-                                            text(format!(
+                                            container(text(m.name.clone()))
+                                                .width(Length::FillPortion(3)),
+                                            container(text(format!(
                                                 "1/{:.0}",
                                                 1.0 / (context.analyzer.stats[i] / char_count)
-                                            ))
-                                            .width(Length::Fill)
+                                            )))
+                                            .width(Length::FillPortion(1))
                                         ])
                                     })
                                     .collect(),
@@ -234,7 +252,7 @@ impl Application for Keymui {
 
         let input = column![cmd_col, cmd_input];
         let notif = row![text(&self.notification.0)];
-        let notif = if let Some(_) = self.notification.1 {
+        let notif = if self.notification.1.is_some() {
             notif.push(button("info").on_press(Message::ViewNotification))
         } else {
             notif
@@ -319,7 +337,7 @@ impl Application for Keymui {
             }
             Message::CommandInputChanged(s) => {
                 let ns = self.command_suggestions.len();
-                if ns > 0 && s.chars().last() == Some(' ') {
+                if ns > 0 && s.ends_with(' ') {
                     let cmd_name = self.commands[self.command_suggestions[ns - 1]].name.clone();
                     self.command_input = if cmd_name == self.command_input {
                         s
@@ -343,6 +361,7 @@ impl Application for Keymui {
             }
             Message::LayoutSelected(s) => {
                 self.current_layout = Some(s);
+                self.load_data();
             }
             Message::ContextSelected(s) => {
                 self.current_metrics = Some(s);
@@ -356,6 +375,7 @@ impl Application for Keymui {
                 self.panes.resize(&split, ratio);
             }
         }
+
         Command::none()
     }
 }
