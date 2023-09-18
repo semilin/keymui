@@ -125,7 +125,7 @@ impl canvas::Program<Message> for LayoutDisplay {
         _cursor: mouse::Cursor,
     ) -> Vec<Geometry> {
         let scale = bounds.width / (self.highest_x + 1.0);
-        let key_size = scale * 0.8;
+        let key_size = scale * 0.9;
 
         let display = self.cache.draw(renderer, bounds.size(), |frame| {
             for (key, data) in &self.keys {
