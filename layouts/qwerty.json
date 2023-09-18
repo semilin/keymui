@@ -1,0 +1,46 @@
+{
+    "name": "QWERTY",
+    "authors": ["Christopher Latham Sholes"],
+    "components": [
+	{ "finger": ["LP"],
+	  "type": "single",
+	  "layer": 0,
+	  "keys": ["q", "a", "z"]
+	},
+	{ "finger": ["LR"],
+	  "type": "single",
+	  "layer": 0,
+	  "keys": ["w", "s", "x"]
+	},
+	{ "finger": ["LM"],
+	  "type": "single",
+	  "layer": 0,
+	  "keys": ["e", "d", "c"]
+	},
+	{ "finger": ["LI"],
+	  "type": "single",
+	  "layer": 0,
+	  "keys": ["r", "f", "v", "t", "g", "b"]
+	},
+	{ "finger": ["RI"],
+	  "type": "single",
+	  "layer": 0,
+	  "keys": ["y", "h", "n", "u", "j", "m"]
+	},
+	{ "finger": ["RM"],
+	  "type": "single",
+	  "layer": 0,
+	  "keys": ["i", "k", ","]
+	},
+	{ "finger": ["RR"],
+	  "type": "single",
+	  "layer": 0,
+	  "keys": ["o", "l", "."]
+	},
+	{ "finger": ["RP"],
+	  "type": "single",
+	  "layer": 0,
+	  "keys": ["p", ";", "/"]
+	}
+    ]
+}
