@@ -120,7 +120,7 @@ impl Keymui {
             self.layouts.get(&self.current_layout.clone()?)?,
             metrics,
             corpus,
-        );
+        )?;
 
         self.layout_display = Some(LayoutDisplay::new(&context));
 
