@@ -8,7 +8,7 @@ use iced::widget::{
 use iced::{alignment, executor, Application, Command, Element, Length, Settings, Theme};
 use iced_aw::{modal, Card};
 use km::{LayoutData, MetricContext};
-use layout_display::LayoutDisplay;
+use layout_display::{ColorStyle, LayoutDisplay};
 use rfd::FileDialog;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -169,17 +169,25 @@ impl Application for Keymui {
                             ),
                             if let Some(display) = &self.layout_display {
                                 container(
-                                    Canvas::new(display)
-                                        .width(Length::Fill)
-                                        .height(Length::Fill),
+                                    column![
+                                        pick_list(
+                                            &ColorStyle::ALL[..],
+                                            Some(display.style),
+                                            Message::DisplayStyleSet
+                                        ),
+                                        Canvas::new(display)
+                                            .width(Length::Fill)
+                                            .height(Length::Fill),
+                                    ]
+                                    .spacing(8),
                                 )
                                 .width(Length::Fill)
                                 .height(Length::Fill)
-                                .padding(10)
                             } else {
                                 container("no layout display available")
                             }
                         ]
+                        .spacing(4)
                         .into()
                     }
                     PaneKind::Metrics => column![
@@ -371,6 +379,12 @@ impl Application for Keymui {
                 self.current_corpus = Some(s);
                 self.load_data();
             }
+            Message::DisplayStyleSet(style) => {
+                if let Some(display) = &mut self.layout_display {
+                    display.style = style;
+                    display.redraw();
+                }
+            }
             Message::Resized(pane_grid::ResizeEvent { split, ratio }) => {
                 self.panes.resize(&split, ratio);
             }
@@ -391,6 +405,7 @@ pub enum Message {
     LayoutSelected(String),
     ContextSelected(String),
     CorpusSelected(String),
+    DisplayStyleSet(ColorStyle),
     Resized(pane_grid::ResizeEvent),
 }
 
