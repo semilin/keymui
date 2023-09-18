@@ -25,6 +25,37 @@ pub fn linear_matches(src: &str, target: &str) -> bool {
     true
 }
 
+pub fn match_list(src: &str, choices: &Vec<String>) -> Vec<usize> {
+    choices
+        .iter()
+        .enumerate()
+        .filter_map(|(i, c)| {
+            if linear_matches(src, c) {
+                Some(i)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+pub fn commonest_completion(matches: &Vec<&str>) -> usize {
+    if matches.len() == 0 {
+        return 0;
+    } else if matches.len() == 1 {
+        return matches[0].len();
+    }
+
+    for i in 0..matches[0].len() {
+        let first = matches[0].chars().nth(i);
+        if !matches.iter().all(|&x| x.chars().nth(i) == first) {
+            return i;
+        }
+    }
+
+    return 0;
+}
+
 pub enum UserArg {}
 
 pub struct UserCommand {
@@ -46,7 +77,8 @@ pub struct Keymui {
     panes: pane_grid::State<Pane>,
     commands: Vec<UserCommand>,
     command_input: String,
-    command_suggestions: Vec<usize>,
+    input_options: Vec<String>,
+    input_completions: Vec<usize>,
     current_layout: Option<String>,
     current_metrics: Option<String>,
     current_corpus: Option<String>,
@@ -68,19 +100,9 @@ impl Keymui {
             self.filter_commands();
         }
     }
+
     pub fn filter_commands(&mut self) {
-        self.command_suggestions = self
-            .commands
-            .iter()
-            .enumerate()
-            .filter_map(|(i, c)| {
-                if linear_matches(&self.command_input, &c.name) {
-                    Some(i)
-                } else {
-                    None
-                }
-            })
-            .collect();
+        self.input_completions = match_list(&self.command_input, &self.input_options);
     }
 }
 
@@ -119,7 +141,8 @@ impl Application for Keymui {
             panes,
             commands,
             command_input: "".to_string(),
-            command_suggestions: vec![],
+            input_options: vec![],
+            input_completions: vec![],
             layout_display: None,
             current_layout: None,
             current_metrics: None,
@@ -140,6 +163,7 @@ impl Application for Keymui {
         keymui.current_metrics = keymui.metric_lists.keys().next().cloned();
         keymui.current_corpus = keymui.corpora.keys().next().cloned();
         keymui.load_data();
+        keymui.input_options = keymui.commands.iter().map(|c| c.name.clone()).collect();
 
         keymui.filter_commands();
         (
@@ -246,7 +270,7 @@ impl Application for Keymui {
         .spacing(10)
         .on_resize(10, Message::Resized);
         let cmd_col = column(
-            self.command_suggestions
+            self.input_completions
                 .iter()
                 .take(5)
                 .map(|i| Element::from(text(&self.commands[*i].name)))
@@ -344,13 +368,20 @@ impl Application for Keymui {
                 let _ = self.set_corpus_list();
             }
             Message::CommandInputChanged(s) => {
-                let ns = self.command_suggestions.len();
+                let ns = self.input_completions.len();
                 if ns > 0 && s.ends_with(' ') {
-                    let cmd_name = self.commands[self.command_suggestions[ns - 1]].name.clone();
-                    self.command_input = if cmd_name == self.command_input {
+                    let common_idx = commonest_completion(
+                        &self
+                            .input_completions
+                            .iter()
+                            .map(|x| self.input_options[*x].as_ref())
+                            .collect(),
+                    );
+                    let common = &self.input_options[self.input_completions[0]][..common_idx];
+                    self.command_input = if common == self.command_input {
                         s
                     } else {
-                        cmd_name
+                        common.to_string()
                     };
                     self.filter_commands();
                     return text_input::move_cursor_to_end::<Message>(text_input::Id::new("cmd"));

@@ -52,8 +52,8 @@ fn color_from_finger(finger: km::Finger) -> Color {
     };
 
     let (r, b) = match finger.hand() {
-        km::Hand::Left => (0.6 + kind, 0.1 + kind),
-        km::Hand::Right => (0.1 + kind, 0.6 + kind),
+        km::Hand::Left => (0.5 + kind, 0.1 + kind),
+        km::Hand::Right => (0.1 + kind, 0.5 + kind),
     };
 
     Color::from_rgb(r, 0.1 + kind, b)
@@ -178,7 +178,7 @@ impl canvas::Program<Message> for LayoutDisplay {
         cursor: mouse::Cursor,
     ) -> mouse::Interaction {
         if cursor.is_over(bounds) {
-            mouse::Interaction::Crosshair
+            mouse::Interaction::Grab
         } else {
             mouse::Interaction::default()
         }
