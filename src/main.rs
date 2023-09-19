@@ -333,11 +333,15 @@ impl Application for Keymui {
                 .collect(),
         );
 
-        let cmd_input = text_input("command input", &self.command_input)
-            .on_input(Message::CommandInputChanged)
-            .on_submit(Message::CommandSubmitted)
-            .id(text_input::Id::new("cmd"));
-
+        let cmd_input = container(
+            text_input("command input", &self.command_input)
+                .on_input(Message::CommandInputChanged)
+                .on_submit(Message::CommandSubmitted)
+                .id(text_input::Id::new("cmd")),
+        )
+            .width(Length::Fill)
+	    .align_y(alignment::Vertical::Bottom);
+	    
         let input = column![cmd_col, cmd_input];
         let notif = row![text(&self.notification.0)];
         let notif = if self.notification.1.is_some() {
@@ -355,7 +359,10 @@ impl Application for Keymui {
                 .height(Length::FillPortion(10))
                 .width(Length::Fill)
                 .center_x(),
-            container(input).width(Length::Fill)
+            container(input)
+                .width(Length::Fill)
+                .height(Length::FillPortion(2))
+		.align_y(alignment::Vertical::Bottom)
         ]
         .width(Length::Fill);
         let view: Element<_> = container(main)
