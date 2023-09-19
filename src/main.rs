@@ -7,10 +7,12 @@ use iced::widget::{
 };
 use iced::{alignment, executor, Application, Command, Element, Length, Settings, Theme};
 use iced_aw::{modal, Card};
+use kc::Swap;
 use km::{LayoutData, MetricContext};
 use layout_display::{ColorStyle, LayoutDisplay};
 use rfd::FileDialog;
 use std::collections::HashMap;
+use std::iter;
 use std::path::PathBuf;
 
 pub fn linear_matches(src: &str, target: &str) -> bool {
@@ -56,12 +58,39 @@ pub fn commonest_completion(matches: &Vec<&str>) -> usize {
     return 0;
 }
 
-pub enum UserArg {}
+#[derive(Debug, Clone)]
+pub enum UserArg {
+    Key,
+}
 
-pub struct UserCommand {
-    pub name: String,
-    pub args: Vec<UserArg>,
-    pub message: Message,
+#[derive(Debug, Clone, Copy)]
+pub enum UserCommand {
+    ImportMetrics,
+    ImportCorpus,
+    ViewNotification,
+    Swap,
+}
+
+impl UserCommand {
+    pub fn args(self) -> Vec<UserArg> {
+        match self {
+            UserCommand::ImportMetrics => vec![],
+            UserCommand::ImportCorpus => vec![],
+            UserCommand::ViewNotification => vec![],
+            UserCommand::Swap => vec![UserArg::Key, UserArg::Key],
+        }
+    }
+}
+
+impl std::fmt::Display for UserCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UserCommand::ImportMetrics => write!(f, "import-metrics"),
+            UserCommand::ImportCorpus => write!(f, "import-corpus"),
+            UserCommand::ViewNotification => write!(f, "view-notification"),
+            UserCommand::Swap => write!(f, "swap"),
+        }
+    }
 }
 
 pub fn main() -> iced::Result {
@@ -93,11 +122,48 @@ pub struct Keymui {
 
 impl Keymui {
     pub fn parse_command(&mut self) {
-        let command = self.commands.iter().find(|c| c.name == self.command_input);
+        let input = self.command_input.clone();
+        let split: Vec<&str> = input.split_whitespace().collect();
+        if split.len() == 0 {
+            return;
+        }
+        let command = self
+            .commands
+            .iter()
+            .map(|x| *x)
+            .find(|c| c.to_string() == split[0]);
         if let Some(cmd) = command {
-            let _ = self.update(cmd.message.clone());
+            let args: Vec<&str> = split
+                .iter()
+                .skip(1)
+                .take(cmd.args().len())
+                .map(|x| *x)
+                .collect();
+
+            self.run_command(&cmd, &args);
+
             self.command_input = String::new();
             self.filter_commands();
+        }
+    }
+
+    pub fn run_command(&mut self, cmd: &UserCommand, args: &[&str]) {
+        let message = match cmd {
+            UserCommand::ImportMetrics => Some(Message::ImportNewMetrics),
+            UserCommand::ImportCorpus => Some(Message::ImportNewCorpus),
+            UserCommand::ViewNotification => Some(Message::ViewNotification),
+            UserCommand::Swap => {
+                let keys: Vec<char> = args.iter().filter_map(|x| x.chars().next()).collect();
+                println!("{:?}", keys);
+                if keys.len() == 2 {
+                    Some(Message::SwapKeys(keys[0], keys[1]))
+                } else {
+                    None
+                }
+            }
+        };
+        if let Some(m) = message {
+            let _ = self.update(m);
         }
     }
 
@@ -119,22 +185,12 @@ impl Application for Keymui {
         }
 
         let commands = vec![
-            UserCommand {
-                name: "import-metrics".to_string(),
-                args: vec![],
-                message: Message::ImportNewMetrics,
-            },
-            UserCommand {
-                name: "import-corpus".to_string(),
-                args: vec![],
-                message: Message::ImportNewCorpus,
-            },
-            UserCommand {
-                name: "view-notification".to_string(),
-                args: vec![],
-                message: Message::ViewNotification,
-            },
+            UserCommand::ImportMetrics,
+            UserCommand::ImportCorpus,
+            UserCommand::ViewNotification,
+            UserCommand::Swap,
         ];
+
         let mut keymui = Self {
             notification: ("started".to_string(), None),
             show_notif_modal: false,
@@ -163,7 +219,7 @@ impl Application for Keymui {
         keymui.current_metrics = keymui.metric_lists.keys().next().cloned();
         keymui.current_corpus = keymui.corpora.keys().next().cloned();
         keymui.load_data();
-        keymui.input_options = keymui.commands.iter().map(|c| c.name.clone()).collect();
+        keymui.input_options = keymui.commands.iter().map(|c| c.to_string()).collect();
 
         keymui.filter_commands();
         (
@@ -273,7 +329,7 @@ impl Application for Keymui {
             self.input_completions
                 .iter()
                 .take(5)
-                .map(|i| Element::from(text(&self.commands[*i].name)))
+                .map(|i| Element::from(text(&self.commands[*i].to_string())))
                 .collect(),
         );
 
@@ -381,7 +437,11 @@ impl Application for Keymui {
                     self.command_input = if common == self.command_input {
                         s
                     } else {
-                        common.to_string()
+                        let mut s = common.to_string();
+                        if ns == 1 {
+                            s.extend(iter::once(' '));
+                        }
+                        s
                     };
                     self.filter_commands();
                     return text_input::move_cursor_to_end::<Message>(text_input::Id::new("cmd"));
@@ -419,6 +479,25 @@ impl Application for Keymui {
             Message::Resized(pane_grid::ResizeEvent { split, ratio }) => {
                 self.panes.resize(&split, ratio);
             }
+            Message::SwapKeys(a, b) => {
+                if let Some(ctx) = &mut self.metric_context {
+                    if let (Some(a), Some(b)) = (
+                        ctx.analyzer.corpus.corpus_char(a),
+                        ctx.analyzer.corpus.corpus_char(b),
+                    ) {
+                        let a = ctx.analyzer.layouts[0].matrix.iter().position(|c| c == a);
+                        let b = ctx.analyzer.layouts[0].matrix.iter().position(|c| c == b);
+                        if let (Some(a), Some(b)) = (a, b) {
+                            ctx.analyzer.swap(0, Swap::new(a, b));
+                            println!("swapped!");
+                            self.layout_display
+                                .as_mut()
+                                .expect("analyzer exists, therefore layout display should")
+                                .update_keys(ctx);
+                        }
+                    };
+                }
+            }
         }
 
         Command::none()
@@ -438,6 +517,7 @@ pub enum Message {
     CorpusSelected(String),
     DisplayStyleSet(ColorStyle),
     Resized(pane_grid::ResizeEvent),
+    SwapKeys(char, char),
 }
 
 #[derive(Copy, Clone)]

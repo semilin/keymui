@@ -60,11 +60,33 @@ fn color_from_finger(finger: km::Finger) -> Color {
 }
 
 impl LayoutDisplay {
-    pub fn new(ctx: &MetricContext) -> Self {
+    fn keys(ctx: &MetricContext) -> Vec<(KeyCoord, Option<KeyData>)> {
         let kb = &ctx.keyboard;
         let l = &ctx.analyzer.layouts[0];
         let corpus = &ctx.analyzer.corpus;
         let max_freq = l.matrix.iter().map(|c| corpus.chars[*c]).max().unwrap();
+        kb.keys
+            .map
+            .iter()
+            .flatten()
+            .zip(l.matrix.iter())
+            .map(|(kc, c)| {
+                (
+                    kc.clone(),
+                    Some(KeyData {
+                        letter: corpus.uncorpus_unigram(*c),
+                        frequency: 0.3
+                            + (1.0 + corpus.chars[*c] as f32 / (max_freq as f32 - 0.3)).log2(),
+                    }),
+                )
+            })
+            .collect()
+    }
+    pub fn update_keys(&mut self, ctx: &MetricContext) {
+        self.keys = Self::keys(ctx);
+    }
+    pub fn new(ctx: &MetricContext) -> Self {
+        let kb = &ctx.keyboard;
         let lowest_y = kb
             .keys
             .map
@@ -84,23 +106,7 @@ impl LayoutDisplay {
             .unwrap() as f32
             / 100.0;
         Self {
-            keys: kb
-                .keys
-                .map
-                .iter()
-                .flatten()
-                .zip(l.matrix.iter())
-                .map(|(kc, c)| {
-                    (
-                        kc.clone(),
-                        Some(KeyData {
-                            letter: corpus.uncorpus_unigram(*c),
-                            frequency: 0.3
-                                + (1.0 + corpus.chars[*c] as f32 / (max_freq as f32 - 0.3)).log2(),
-                        }),
-                    )
-                })
-                .collect(),
+            keys: Self::keys(ctx),
             lowest_y,
             highest_x,
             style: ColorStyle::Frequency,
@@ -154,7 +160,7 @@ impl canvas::Program<Message> for LayoutDisplay {
                         Point::new((2.0 * bx + key_size) / 2.0, (2.0 * by + key_size) / 2.0);
                     text.horizontal_alignment = Horizontal::Center;
                     text.vertical_alignment = Vertical::Center;
-		    text.size = 0.5 * scale;
+                    text.size = 0.5 * scale;
                     frame.fill_text(text)
                 }
             }
