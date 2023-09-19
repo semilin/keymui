@@ -339,9 +339,9 @@ impl Application for Keymui {
                 .on_submit(Message::CommandSubmitted)
                 .id(text_input::Id::new("cmd")),
         )
-            .width(Length::Fill)
-	    .align_y(alignment::Vertical::Bottom);
-	    
+        .width(Length::Fill)
+        .align_y(alignment::Vertical::Bottom);
+
         let input = column![cmd_col, cmd_input];
         let notif = row![text(&self.notification.0)];
         let notif = if self.notification.1.is_some() {
@@ -362,7 +362,7 @@ impl Application for Keymui {
             container(input)
                 .width(Length::Fill)
                 .height(Length::FillPortion(2))
-		.align_y(alignment::Vertical::Bottom)
+                .align_y(alignment::Vertical::Bottom)
         ]
         .width(Length::Fill);
         let view: Element<_> = container(main)
@@ -497,10 +497,13 @@ impl Application for Keymui {
                         if let (Some(a), Some(b)) = (a, b) {
                             ctx.analyzer.swap(0, Swap::new(a, b));
                             println!("swapped!");
-                            self.layout_display
+                            let display = self
+                                .layout_display
                                 .as_mut()
-                                .expect("analyzer exists, therefore layout display should")
-                                .update_keys(ctx);
+                                .expect("analyzer exists, therefore layout display should");
+
+                            display.update_keys(ctx);
+                            display.redraw();
                         }
                     };
                 }
