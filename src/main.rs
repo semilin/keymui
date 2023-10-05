@@ -495,7 +495,7 @@ impl Application for Keymui {
                         let a = ctx.analyzer.layouts[0].matrix.iter().position(|c| c == a);
                         let b = ctx.analyzer.layouts[0].matrix.iter().position(|c| c == b);
                         if let (Some(a), Some(b)) = (a, b) {
-                            ctx.analyzer.swap(0, Swap::new(a, b));
+                            ctx.analyzer.swap(0, &Swap::new(a, b), false);
                             println!("swapped!");
                             let display = self
                                 .layout_display
