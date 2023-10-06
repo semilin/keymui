@@ -61,6 +61,7 @@ pub fn commonest_completion(matches: &Vec<&str>) -> usize {
 #[derive(Debug, Clone)]
 pub enum UserArg {
     Key,
+    NaturalNum,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -69,6 +70,7 @@ pub enum UserCommand {
     ImportCorpus,
     ViewNotification,
     Swap,
+    Precision,
 }
 
 impl UserCommand {
@@ -78,6 +80,7 @@ impl UserCommand {
             UserCommand::ImportCorpus => vec![],
             UserCommand::ViewNotification => vec![],
             UserCommand::Swap => vec![UserArg::Key, UserArg::Key],
+            UserCommand::Precision => vec![UserArg::NaturalNum],
         }
     }
 }
@@ -89,6 +92,7 @@ impl std::fmt::Display for UserCommand {
             UserCommand::ImportCorpus => write!(f, "import-corpus"),
             UserCommand::ViewNotification => write!(f, "view-notification"),
             UserCommand::Swap => write!(f, "swap"),
+            UserCommand::Precision => write!(f, "precision"),
         }
     }
 }
@@ -113,6 +117,8 @@ pub struct Keymui {
     current_corpus: Option<String>,
     layout_display: Option<LayoutDisplay>,
     base_dirs: BaseDirs,
+
+    precision: u32,
 
     metric_context: Option<MetricContext>,
     metric_lists: HashMap<String, PathBuf>,
@@ -161,6 +167,18 @@ impl Keymui {
                     None
                 }
             }
+            UserCommand::Precision => {
+                if let Some(arg) = args.iter().next() {
+                    let num: Result<u32, _> = arg.parse();
+                    if let Ok(num) = num {
+                        Some(Message::SetPrecision(num))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
         };
         if let Some(m) = message {
             let _ = self.update(m);
@@ -189,6 +207,7 @@ impl Application for Keymui {
             UserCommand::ImportCorpus,
             UserCommand::ViewNotification,
             UserCommand::Swap,
+            UserCommand::Precision,
         ];
 
         let mut keymui = Self {
@@ -208,6 +227,7 @@ impl Application for Keymui {
             metric_lists: HashMap::new(),
             layouts: HashMap::new(),
             corpora: HashMap::new(),
+            precision: 1,
         };
         let e = keymui.load_layouts();
         if let Err(e) = e {
@@ -305,10 +325,25 @@ impl Application for Keymui {
                                             container(text(m.name.clone()))
                                                 .width(Length::FillPortion(3)),
                                             container(text(format!(
-                                                "1/{:.0}",
-                                                1.0 / (context.analyzer.stats[i] / char_count)
+                                                "{}/{:.0}",
+                                                self.precision,
+                                                self.precision as f32
+                                                    / (context.analyzer.stats[i] / char_count)
                                             )))
-                                            .width(Length::FillPortion(1))
+                                            .width(Length::FillPortion(1)),
+                                            container(text({
+                                                let diff = context.analyzer.stat_diffs[i];
+                                                if diff == 0.0 {
+                                                    "".to_string()
+                                                } else {
+                                                    format!(
+                                                        "{:+.2}%",
+                                                        100.0 * diff
+                                                            / (context.analyzer.stats[i] - diff)
+                                                    )
+                                                }
+                                            }))
+                                            .width(Length::FillPortion(1)),
                                         ])
                                     })
                                     .collect(),
@@ -508,6 +543,9 @@ impl Application for Keymui {
                     };
                 }
             }
+            Message::SetPrecision(n) => {
+                self.precision = n;
+            }
         }
 
         Command::none()
@@ -528,6 +566,7 @@ pub enum Message {
     DisplayStyleSet(ColorStyle),
     Resized(pane_grid::ResizeEvent),
     SwapKeys(char, char),
+    SetPrecision(u32),
 }
 
 #[derive(Copy, Clone)]
