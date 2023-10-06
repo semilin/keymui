@@ -360,13 +360,15 @@ impl Application for Keymui {
         .width(Length::Fill)
         .spacing(10)
         .on_resize(10, Message::Resized);
-        let cmd_col = column(
+        let cmd_col = container(column(
             self.input_completions
                 .iter()
                 .take(5)
                 .map(|i| Element::from(text(&self.commands[*i].to_string())))
                 .collect(),
-        );
+        ))
+        .height(Length::FillPortion(2))
+        .align_y(alignment::Vertical::Bottom);
 
         let cmd_input = container(
             text_input("command input", &self.command_input)
@@ -375,6 +377,7 @@ impl Application for Keymui {
                 .id(text_input::Id::new("cmd")),
         )
         .width(Length::Fill)
+        .height(Length::FillPortion(1))
         .align_y(alignment::Vertical::Bottom);
 
         let input = column![cmd_col, cmd_input];
@@ -396,8 +399,8 @@ impl Application for Keymui {
                 .center_x(),
             container(input)
                 .width(Length::Fill)
-                .height(Length::FillPortion(2))
                 .align_y(alignment::Vertical::Bottom)
+                .height(Length::FillPortion(2))
         ]
         .width(Length::Fill);
         let view: Element<_> = container(main)
