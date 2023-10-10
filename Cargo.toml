@@ -14,3 +14,4 @@ rfd = {version = "0.11.4"}
 directories = "5.0.1"
 serde_json = "1.0.104"
 anyhow = "1.0.72"
+serde = { version = "1.0.188", features = ["serde_derive"] }

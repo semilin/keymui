@@ -9,8 +9,28 @@ use std::io::Write;
 use std::path::PathBuf;
 
 impl Keymui {
+    pub fn config_dir(&self) -> PathBuf {
+        self.base_dirs.config_dir().join("keymeow")
+    }
+
     pub fn data_dir(&self) -> PathBuf {
         self.base_dirs.data_dir().join("keymeow")
+    }
+
+    pub fn load_config(&mut self) -> Result<()> {
+        let cdir = self.config_dir();
+        fs::create_dir_all(&cdir)?;
+        let path = cdir.join("config.json");
+        self.config = serde_json::from_str(&fs::read_to_string(path)?)?;
+        Ok(())
+    }
+
+    pub fn save_config(&self) -> Result<()> {
+        let cdir = self.config_dir();
+        let path = cdir.join("config.json");
+        let s = serde_json::to_string(&self.config)?;
+        fs::write(path, s)?;
+        Ok(())
     }
 
     pub fn load_layouts(&mut self) -> Result<()> {

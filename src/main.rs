@@ -1,16 +1,23 @@
 mod layout_display;
 mod logic;
 use directories::BaseDirs;
+use iced::subscription::events;
+use iced::theme;
 use iced::widget::pane_grid::{self, Axis, PaneGrid};
 use iced::widget::{
     button, column, container, pick_list, responsive, row, scrollable, text, text_input, Canvas,
 };
-use iced::{alignment, executor, Application, Command, Element, Length, Settings, Theme};
+use iced::window;
+use iced::{
+    alignment, executor, Application, Command, Element, Event, Length, Settings, Subscription,
+    Theme,
+};
 use iced_aw::{modal, Card};
 use kc::Swap;
 use km::{LayoutData, MetricContext};
 use layout_display::{ColorStyle, LayoutDisplay};
 use rfd::FileDialog;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::iter;
 use std::path::PathBuf;
@@ -100,8 +107,41 @@ impl std::fmt::Display for UserCommand {
 pub fn main() -> iced::Result {
     Keymui::run(Settings {
         antialiasing: true,
+        exit_on_close_request: false,
         ..Settings::default()
     })
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum DisplayStyle {
+    Ratio,
+    Percentage,
+}
+
+impl Default for DisplayStyle {
+    fn default() -> Self {
+        DisplayStyle::Ratio
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Config {
+    metric_display_styles: HashMap<String, DisplayStyle>,
+    stat_precision: u32,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            metric_display_styles: HashMap::from([
+                ("roll".to_string(), DisplayStyle::Percentage),
+                ("sr-roll".to_string(), DisplayStyle::Percentage),
+                ("alt".to_string(), DisplayStyle::Percentage),
+                ("redir".to_string(), DisplayStyle::Percentage),
+            ]),
+            stat_precision: 1,
+        }
+    }
 }
 
 pub struct Keymui {
@@ -118,12 +158,12 @@ pub struct Keymui {
     layout_display: Option<LayoutDisplay>,
     base_dirs: BaseDirs,
 
-    precision: u32,
-
     metric_context: Option<MetricContext>,
     metric_lists: HashMap<String, PathBuf>,
     layouts: HashMap<String, LayoutData>,
     corpora: HashMap<String, PathBuf>,
+
+    config: Config,
 }
 
 impl Keymui {
@@ -227,7 +267,8 @@ impl Application for Keymui {
             metric_lists: HashMap::new(),
             layouts: HashMap::new(),
             corpora: HashMap::new(),
-            precision: 1,
+
+            config: Config::default(),
         };
         let e = keymui.load_layouts();
         if let Err(e) = e {
@@ -239,6 +280,7 @@ impl Application for Keymui {
         keymui.current_metrics = keymui.metric_lists.keys().next().cloned();
         keymui.current_corpus = keymui.corpora.keys().next().cloned();
         keymui.load_data();
+        let _ = keymui.load_config();
         keymui.input_options = keymui.commands.iter().map(|c| c.to_string()).collect();
 
         keymui.filter_commands();
@@ -324,12 +366,34 @@ impl Application for Keymui {
                                         Element::from(row![
                                             container(text(m.name.clone()))
                                                 .width(Length::FillPortion(3)),
-                                            container(text(format!(
-                                                "{}/{:.0}",
-                                                self.precision,
-                                                self.precision as f32
-                                                    / (context.analyzer.stats[i] / char_count)
-                                            )))
+                                            container(
+                                                button(text(
+                                                    match self
+                                                        .config
+                                                        .metric_display_styles
+                                                        .get(&context.metrics[i].short)
+                                                        .unwrap_or(&DisplayStyle::Ratio)
+                                                    {
+                                                        DisplayStyle::Ratio => format!(
+                                                            "{}/{:.0}",
+                                                            self.config.stat_precision,
+                                                            self.config.stat_precision as f32
+                                                                / (context.analyzer.stats[i]
+                                                                    / char_count)
+                                                        ),
+                                                        DisplayStyle::Percentage => format!(
+                                                            "{:.2}%",
+                                                            100.0 * context.analyzer.stats[i]
+                                                                / char_count
+                                                        ),
+                                                    }
+                                                ))
+                                                .on_press(Message::ToggleDisplayStyle(
+                                                    context.metrics[i].short.clone()
+                                                ))
+                                                .style(theme::Button::Text)
+                                                .padding(0)
+                                            )
                                             .width(Length::FillPortion(1)),
                                             container(text({
                                                 let diff = context.analyzer.stat_diffs[i];
@@ -427,6 +491,10 @@ impl Application for Keymui {
 
     fn theme(&self) -> Theme {
         Theme::Dark
+    }
+
+    fn subscription(&self) -> Subscription<Message> {
+        events().map(|x| Message::RuntimeEvent(x))
     }
 
     fn update(&mut self, message: Message) -> Command<Message> {
@@ -547,8 +615,28 @@ impl Application for Keymui {
                 }
             }
             Message::SetPrecision(n) => {
-                self.precision = n;
+                self.config.stat_precision = n;
             }
+            Message::ToggleDisplayStyle(s) => {
+                let style = self.config.metric_display_styles.get_mut(&s);
+                if let Some(style) = style {
+                    *style = match style {
+                        DisplayStyle::Ratio => DisplayStyle::Percentage,
+                        DisplayStyle::Percentage => DisplayStyle::Ratio,
+                    }
+                } else {
+                    self.config
+                        .metric_display_styles
+                        .insert(s, DisplayStyle::Percentage);
+                }
+            }
+            Message::RuntimeEvent(e) => match e {
+                Event::Window(window::Event::CloseRequested) => {
+                    let _ = self.save_config();
+                    return window::close();
+                }
+                _ => (),
+            },
         }
 
         Command::none()
@@ -570,6 +658,8 @@ pub enum Message {
     Resized(pane_grid::ResizeEvent),
     SwapKeys(char, char),
     SetPrecision(u32),
+    ToggleDisplayStyle(String),
+    RuntimeEvent(Event),
 }
 
 #[derive(Copy, Clone)]

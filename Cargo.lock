@@ -1330,6 +1330,7 @@ dependencies = [
  "keycat",
  "keymeow",
  "rfd",
+ "serde",
  "serde_json",
 ]
 
