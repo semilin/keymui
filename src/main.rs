@@ -69,6 +69,7 @@ pub fn commonest_completion(matches: &Vec<&str>) -> usize {
 pub enum UserArg {
     Key,
     NaturalNum,
+    String,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -78,6 +79,7 @@ pub enum UserCommand {
     ViewNotification,
     Swap,
     Precision,
+    NgramFrequency,
 }
 
 impl UserCommand {
@@ -88,6 +90,7 @@ impl UserCommand {
             UserCommand::ViewNotification => vec![],
             UserCommand::Swap => vec![UserArg::Key, UserArg::Key],
             UserCommand::Precision => vec![UserArg::NaturalNum],
+            UserCommand::NgramFrequency => vec![UserArg::String, UserArg::String],
         }
     }
 }
@@ -100,6 +103,7 @@ impl std::fmt::Display for UserCommand {
             UserCommand::ViewNotification => write!(f, "view-notification"),
             UserCommand::Swap => write!(f, "swap"),
             UserCommand::Precision => write!(f, "precision"),
+            UserCommand::NgramFrequency => write!(f, "ngram-frequency"),
         }
     }
 }
@@ -219,6 +223,41 @@ impl Keymui {
                     None
                 }
             }
+            UserCommand::NgramFrequency => {
+                if let Some(ctx) = &self.metric_context {
+                    let corpus = &ctx.analyzer.corpus;
+                    let corpus_total = corpus.chars.iter().sum::<u32>() as f32;
+                    let total: Vec<f32> = args
+                        .iter()
+                        .map(|arg| {
+                            let chars: Vec<usize> = arg
+                                .chars()
+                                .flat_map(|c| corpus.corpus_char(c))
+                                .cloned()
+                                .collect();
+                            let freqs: [u32; 2] = match &chars[..] {
+                                [a] => [corpus.chars[*a], 0],
+                                [a, b] => {
+                                    let idx = corpus.bigram_idx(*a, *b);
+                                    [corpus.bigrams[idx], corpus.skipgrams[idx]]
+                                }
+                                [a, b, c] => {
+                                    let idx = corpus.trigram_idx(*a, *b, *c);
+                                    [corpus.trigrams[idx], 0]
+                                }
+                                _ => [0, 0],
+                            };
+                            freqs
+                        })
+                        .fold([0, 0], |[t1, t2], [n1, n2]| [t1 + n1, t2 + n2])
+                        .iter()
+                        .map(|x| 100.0 * *x as f32 / corpus_total)
+                        .collect();
+                    self.notification =
+                        (format!("total: ({:.2}%, {:.2}%)", total[0], total[1]), None);
+                }
+                None
+            }
         };
         if let Some(m) = message {
             let _ = self.update(m);
@@ -248,6 +287,7 @@ impl Application for Keymui {
             UserCommand::ViewNotification,
             UserCommand::Swap,
             UserCommand::Precision,
+            UserCommand::NgramFrequency,
         ];
 
         let mut keymui = Self {
