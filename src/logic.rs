@@ -1,4 +1,4 @@
-use crate::layout_display::LayoutDisplay;
+use crate::layout_display::{ColorStyle, LayoutDisplay};
 use crate::Keymui;
 use anyhow::{anyhow, Result};
 use kc::Corpus;
@@ -142,7 +142,11 @@ impl Keymui {
             corpus,
         )?;
 
-        self.layout_display = Some(LayoutDisplay::new(&context));
+        self.layout_display = Some(LayoutDisplay::new(
+            &context,
+            ColorStyle::Frequency,
+            self.nstrokes_metric,
+        ));
         self.metric_context = Some(context);
 
         self.set_nstroke_list();

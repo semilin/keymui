@@ -707,6 +707,9 @@ impl Application for Keymui {
             Message::DisplayStyleSet(style) => {
                 if let Some(display) = &mut self.layout_display {
                     display.style = style;
+                    if let Some(ctx) = &self.metric_context {
+                        display.update_keys(ctx, self.nstrokes_metric);
+                    }
                     display.redraw();
                 }
             }
@@ -729,7 +732,7 @@ impl Application for Keymui {
                                 .as_mut()
                                 .expect("analyzer exists, therefore layout display should");
 
-                            display.update_keys(ctx);
+                            display.update_keys(ctx, self.nstrokes_metric);
                             display.redraw();
 
                             self.set_nstroke_list();
@@ -765,6 +768,14 @@ impl Application for Keymui {
                 self.nstrokes_metric = n;
                 self.set_nstroke_list();
                 self.sort_nstroke_list();
+                if let Some(display) = &mut self.layout_display {
+                    let ctx = self
+                        .metric_context
+                        .as_ref()
+                        .expect("display exists, therefore context should");
+                    display.update_keys(&ctx, self.nstrokes_metric);
+                    display.redraw();
+                }
             }
         }
 

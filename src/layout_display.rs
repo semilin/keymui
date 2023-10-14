@@ -15,18 +15,25 @@ pub struct KeyData {
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub enum ColorStyle {
     Frequency,
+    Metric,
     Fingers,
     None,
 }
 
 impl ColorStyle {
-    pub const ALL: [ColorStyle; 3] = [ColorStyle::Frequency, ColorStyle::Fingers, ColorStyle::None];
+    pub const ALL: [ColorStyle; 4] = [
+        ColorStyle::Frequency,
+        ColorStyle::Metric,
+        ColorStyle::Fingers,
+        ColorStyle::None,
+    ];
 }
 
 impl fmt::Display for ColorStyle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ColorStyle::Frequency => write!(f, "Frequency"),
+            ColorStyle::Metric => write!(f, "Metric"),
             ColorStyle::Fingers => write!(f, "Fingers"),
             ColorStyle::None => write!(f, "None"),
         }
@@ -60,32 +67,85 @@ fn color_from_finger(finger: km::Finger) -> Color {
 }
 
 impl LayoutDisplay {
-    fn keys(ctx: &MetricContext) -> Vec<(KeyCoord, Option<KeyData>)> {
+    fn keys(
+        ctx: &MetricContext,
+        style: ColorStyle,
+        metric: usize,
+    ) -> Vec<(KeyCoord, Option<KeyData>)> {
         let kb = &ctx.keyboard;
         let l = &ctx.analyzer.layouts[0];
         let corpus = &ctx.analyzer.corpus;
-        let max_freq = l.matrix.iter().map(|c| corpus.chars[*c]).max().unwrap();
+        let freqs: Vec<f32> = match style {
+            ColorStyle::Frequency => {
+                let max_freq = l.matrix.iter().map(|c| corpus.chars[*c]).max().unwrap();
+                l.matrix
+                    .iter()
+                    .map(|c| 0.3 + (1.0 + corpus.chars[*c] as f32 / (max_freq as f32 - 0.3)).log2())
+                    .collect()
+            }
+            ColorStyle::Metric => {
+                let counts: Vec<f32> = (0..ctx.analyzer.layouts[0].matrix.len())
+                    .map(|p| {
+                        let sum: f32 = ctx
+                            .analyzer
+                            .data
+                            .strokes
+                            .iter()
+                            .filter(|data| data.nstroke.to_vec().contains(&p))
+                            .filter_map(|s| match s.amounts.iter().find(|am| am.metric == metric) {
+                                Some(am) => Some((&s.nstroke, am)),
+                                None => None,
+                            })
+                            .map(|(ns, am)| {
+                                am.amount
+                                    * ctx.analyzer.layouts[0].frequency(
+                                        &ctx.analyzer.corpus,
+                                        &ns,
+                                        Some(ctx.metrics[metric].ngram_type),
+                                    ) as f32
+                            })
+                            .sum();
+                        sum
+                    })
+                    .collect();
+
+                let max_freq = counts
+                    .iter()
+                    .max_by(|a, b| a.partial_cmp(b).unwrap())
+                    .unwrap();
+
+                counts
+                    .iter()
+                    .map(|x| 0.3 + (1.0 + x / (*max_freq - 0.3)).log2())
+                    .collect()
+            }
+            _ => vec![0.0; l.matrix.len()],
+        };
         kb.keys
             .map
             .iter()
             .flatten()
             .zip(l.matrix.iter())
-            .map(|(kc, c)| {
+            .enumerate()
+            .map(|(i, (kc, c))| {
                 (
                     kc.clone(),
                     Some(KeyData {
                         letter: corpus.uncorpus_unigram(*c),
-                        frequency: 0.3
-                            + (1.0 + corpus.chars[*c] as f32 / (max_freq as f32 - 0.3)).log2(),
+                        frequency: match style {
+                            ColorStyle::Frequency => freqs[i],
+                            ColorStyle::Metric => freqs[i],
+                            _ => 0.0,
+                        },
                     }),
                 )
             })
             .collect()
     }
-    pub fn update_keys(&mut self, ctx: &MetricContext) {
-        self.keys = Self::keys(ctx);
+    pub fn update_keys(&mut self, ctx: &MetricContext, metric: usize) {
+        self.keys = Self::keys(ctx, self.style, metric);
     }
-    pub fn new(ctx: &MetricContext) -> Self {
+    pub fn new(ctx: &MetricContext, style: ColorStyle, metric: usize) -> Self {
         let kb = &ctx.keyboard;
         let lowest_y = kb
             .keys
@@ -106,7 +166,7 @@ impl LayoutDisplay {
             .unwrap() as f32
             / 100.0;
         Self {
-            keys: Self::keys(ctx),
+            keys: Self::keys(ctx, style, metric),
             lowest_y,
             highest_x,
             style: ColorStyle::Frequency,
@@ -137,7 +197,7 @@ impl canvas::Program<Message> for LayoutDisplay {
             for (key, data) in &self.keys {
                 let color = match self.style {
                     ColorStyle::None => Color::from_rgb(0.8, 0.8, 0.8),
-                    ColorStyle::Frequency => {
+                    ColorStyle::Frequency | ColorStyle::Metric => {
                         if let Some(data) = &data {
                             let f = data.frequency;
                             Color::from_rgb(f / 1.5, f / 1.5, f)
