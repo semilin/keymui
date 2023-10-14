@@ -167,6 +167,9 @@ pub struct Keymui {
     layouts: HashMap<String, LayoutData>,
     corpora: HashMap<String, PathBuf>,
 
+    nstrokes_metric: usize,
+    nstrokes_list: Vec<(usize, String)>,
+
     config: Config,
 }
 
@@ -281,6 +284,21 @@ impl Application for Keymui {
             panes.split(Axis::Vertical, &pane.0, Pane::new(PaneKind::Metrics));
         }
 
+        panes.split(
+            Axis::Horizontal,
+            panes
+                .panes
+                .clone()
+                .iter()
+                .find(|p| match p.1.kind {
+                    PaneKind::Metrics => true,
+                    _ => false,
+                })
+                .unwrap()
+                .0,
+            Pane::new(PaneKind::Nstrokes),
+        );
+
         let commands = vec![
             UserCommand::ImportMetrics,
             UserCommand::ImportCorpus,
@@ -307,6 +325,9 @@ impl Application for Keymui {
             metric_lists: HashMap::new(),
             layouts: HashMap::new(),
             corpora: HashMap::new(),
+
+            nstrokes_metric: 0,
+            nstrokes_list: vec![],
 
             config: Config::default(),
         };
@@ -404,8 +425,13 @@ impl Application for Keymui {
                                     .enumerate()
                                     .map(|(i, m)| {
                                         Element::from(row![
-                                            container(text(m.name.clone()))
-                                                .width(Length::FillPortion(3)),
+                                            container(
+                                                button(text(m.name.clone()))
+                                                    .on_press(Message::SetNstrokesMetric(i))
+                                                    .style(theme::Button::Text)
+                                                    .padding(0)
+                                            )
+                                            .width(Length::FillPortion(3)),
                                             container(
                                                 button(text(
                                                     match self
@@ -458,6 +484,61 @@ impl Application for Keymui {
                     ]
                     .spacing(5)
                     .into(),
+                    PaneKind::Nstrokes => {
+                        if let Some(ctx) = &self.metric_context {
+                            let char_count = ctx.analyzer.layouts[0]
+                                .total_char_count(&ctx.analyzer.corpus)
+                                as f32;
+                            column![
+                                text(if self.nstrokes_list.len() == 0 {
+                                    "".to_string()
+                                } else {
+                                    ctx.metrics[self.nstrokes_metric].name.clone()
+                                })
+                                .size(18),
+                                scrollable(column(
+                                    self.nstrokes_list
+                                        .iter()
+                                        .enumerate()
+                                        .map(|(i, n)| {
+                                            Element::from(
+                                                container(
+                                                    row![
+                                                        container(text(
+                                                            self.nstrokes_list[i].1.clone()
+                                                        ))
+                                                        .width(Length::FillPortion(1)),
+                                                        container(text(format!(
+                                                            "{:.2}%",
+                                                            100.0
+                                                                * ctx.analyzer.layouts[0].frequency(
+                                                                    &ctx.analyzer.corpus,
+                                                                    &ctx.analyzer.data.strokes[n.0]
+                                                                        .nstroke,
+                                                                    Some(
+                                                                        ctx.analyzer.data.metrics
+                                                                            [self.nstrokes_metric]
+                                                                    ),
+                                                                )
+                                                                    as f32
+                                                                / char_count
+                                                        )))
+                                                        .width(Length::FillPortion(1))
+                                                    ]
+                                                    .width(Length::Fill),
+                                                )
+                                                .width(Length::Fill),
+                                            )
+                                        })
+                                        .collect(),
+                                ))
+                            ]
+                            .spacing(5)
+                            .into()
+                        } else {
+                            container(text("no nstrokes available")).into()
+                        }
+                    }
                 }
             }))
         })
@@ -677,6 +758,11 @@ impl Application for Keymui {
                 }
                 _ => (),
             },
+            Message::SetNstrokesMetric(n) => {
+                self.nstrokes_metric = n;
+                self.set_nstroke_list();
+                self.sort_nstroke_list();
+            }
         }
 
         Command::none()
@@ -699,6 +785,7 @@ pub enum Message {
     SwapKeys(char, char),
     SetPrecision(u32),
     ToggleDisplayStyle(String),
+    SetNstrokesMetric(usize),
     RuntimeEvent(Event),
 }
 
@@ -706,6 +793,7 @@ pub enum Message {
 pub enum PaneKind {
     Layout,
     Metrics,
+    Nstrokes,
 }
 
 #[derive(Copy, Clone)]

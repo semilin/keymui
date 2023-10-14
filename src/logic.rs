@@ -143,8 +143,10 @@ impl Keymui {
         )?;
 
         self.layout_display = Some(LayoutDisplay::new(&context));
-
         self.metric_context = Some(context);
+
+        self.set_nstroke_list();
+        self.sort_nstroke_list();
 
         Some(())
     }
@@ -163,5 +165,41 @@ impl Keymui {
             self.metric_lists.insert(name, path);
         }
         Ok(())
+    }
+
+    pub fn set_nstroke_list(&mut self) {
+        if let Some(ctx) = &self.metric_context {
+            self.nstrokes_list = Vec::with_capacity(ctx.analyzer.data.strokes.len() / 3);
+            for (i, stroke) in ctx.analyzer.data.strokes.iter().enumerate() {
+                if stroke
+                    .amounts
+                    .iter()
+                    .any(|m| m.metric == self.nstrokes_metric)
+                {
+                    self.nstrokes_list.push((
+                        i,
+                        ctx.analyzer.layouts[0]
+                            .nstroke_chars(&ctx.analyzer.data.strokes[i].nstroke)
+                            .iter()
+                            .map(|c| ctx.analyzer.corpus.uncorpus_unigram(*c))
+                            .collect::<String>(),
+                    ));
+                }
+            }
+        }
+    }
+
+    pub fn sort_nstroke_list(&mut self) {
+        if let Some(ctx) = &self.metric_context {
+            let an = &ctx.analyzer;
+            self.nstrokes_list.sort_by_key(|i| {
+                an.layouts[0].frequency(
+                    &an.corpus,
+                    &an.data.strokes[i.0].nstroke,
+                    Some(an.data.metrics[self.nstrokes_metric]),
+                )
+            });
+            self.nstrokes_list.reverse();
+        }
     }
 }
