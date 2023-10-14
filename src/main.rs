@@ -731,6 +731,9 @@ impl Application for Keymui {
 
                             display.update_keys(ctx);
                             display.redraw();
+
+                            self.set_nstroke_list();
+                            self.sort_nstroke_list();
                         }
                     };
                 }
