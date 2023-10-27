@@ -116,7 +116,7 @@ impl LayoutDisplay {
 
                 counts
                     .iter()
-                    .map(|x| 0.3 + (1.0 + x / (*max_freq - 0.3)).log2())
+                    .map(|x| 0.2 + (1.0 + x / (*max_freq - 0.2)).log2())
                     .collect()
             }
             _ => vec![0.0; l.matrix.len()],
@@ -197,7 +197,7 @@ impl canvas::Program<Message> for LayoutDisplay {
             for (key, data) in &self.keys {
                 let color = match self.style {
                     ColorStyle::None => Color::from_rgb(0.8, 0.8, 0.8),
-                    ColorStyle::Frequency | ColorStyle::Metric => {
+                    ColorStyle::Frequency => {
                         if let Some(data) = &data {
                             let f = data.frequency;
                             Color::from_rgb(f / 1.5, f / 1.5, f)
@@ -205,6 +205,14 @@ impl canvas::Program<Message> for LayoutDisplay {
                             Color::from_rgb(0.3, 0.3, 0.3)
                         }
                     }
+		    ColorStyle::Metric => {
+			if let Some(data) = &data {
+                            let f = data.frequency;
+                            Color::from_rgb(f / 1.2, f / 1.5, f / 1.0)
+                        } else {
+                            Color::from_rgb(0.3, 0.3, 0.3)
+                        }
+		    }
                     ColorStyle::Fingers => color_from_finger(key.finger),
                 };
                 frame.fill_rectangle(
