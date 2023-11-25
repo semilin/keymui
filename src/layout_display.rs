@@ -208,7 +208,7 @@ impl canvas::Program<Message> for LayoutDisplay {
 	let width = 1.0 + self.highest_x - self.lowest_x;
 	let provided = (0.95 * bounds.width).min(500.0);
 	let offset = (bounds.width - provided) / 2.0;
-	let scale = (provided / width);
+	let scale = provided / width;
 	let key_size = scale * 0.9;
 	
         let display = self.cache.draw(renderer, bounds.size(), |frame| {

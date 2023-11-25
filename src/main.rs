@@ -1,3 +1,4 @@
+mod download;
 mod layout_display;
 mod logic;
 use directories::BaseDirs;
@@ -109,6 +110,7 @@ impl std::fmt::Display for UserCommand {
 }
 
 pub fn main() -> iced::Result {
+    logic::initial_setup();
     Keymui::run(Settings {
         antialiasing: true,
         exit_on_close_request: false,
@@ -285,7 +287,7 @@ impl Application for Keymui {
             panes.split(Axis::Vertical, &pane.0, Pane::new(PaneKind::Metrics));
         }
 
-        panes.split(
+	panes.split(
             Axis::Horizontal,
             panes
                 .panes

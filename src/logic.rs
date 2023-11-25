@@ -1,5 +1,7 @@
 use crate::layout_display::{ColorStyle, LayoutDisplay};
 use crate::Keymui;
+use crate::download;
+use directories::BaseDirs;
 use anyhow::{anyhow, Result};
 use kc::Corpus;
 use km::{self, MetricContext};
@@ -7,6 +9,18 @@ use std::ffi::OsStr;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
+
+pub fn initial_setup() {
+    let base_dirs = BaseDirs::new().unwrap();
+    let data_dir = base_dirs.data_dir().join("keymeow");
+    if data_dir.exists() {
+	return;
+    }
+    fs::create_dir_all(&data_dir.join("layouts")).unwrap();
+    fs::create_dir_all(&data_dir.join("corpora")).unwrap();
+    fs::create_dir_all(&data_dir.join("metrics")).unwrap();
+    let _ = download::download_files(&data_dir);
+}
 
 impl Keymui {
     pub fn config_dir(&self) -> PathBuf {
