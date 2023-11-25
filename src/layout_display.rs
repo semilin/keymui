@@ -45,6 +45,7 @@ pub struct LayoutDisplay {
     keys: Vec<(KeyCoord, Option<KeyData>)>,
     lowest_y: f32,
     highest_x: f32,
+    lowest_x: f32,
     pub style: ColorStyle,
     cache: Cache,
 }
@@ -132,9 +133,9 @@ impl LayoutDisplay {
                     kc.clone(),
                     Some(KeyData {
                         letter: match corpus.uncorpus_unigram(*c) {
-			    '\0' => ' ',
-			    _ => corpus.uncorpus_unigram(*c),
-			},
+                            '\0' => ' ',
+                            _ => corpus.uncorpus_unigram(*c),
+                        },
                         frequency: match style {
                             ColorStyle::Frequency => freqs[i],
                             ColorStyle::Metric => freqs[i],
@@ -168,10 +169,21 @@ impl LayoutDisplay {
             .max()
             .unwrap() as f32
             / 100.0;
+        // TODO this sucks
+        let lowest_x = kb
+            .keys
+            .map
+            .iter()
+            .flatten()
+            .map(|kc| (kc.x * 100.0).ceil() as i32)
+            .min()
+            .unwrap() as f32
+            / 100.0;
         Self {
             keys: Self::keys(ctx, style, metric),
             lowest_y,
             highest_x,
+            lowest_x,
             style: ColorStyle::Frequency,
             cache: Cache::default(),
         }
@@ -193,9 +205,12 @@ impl canvas::Program<Message> for LayoutDisplay {
         bounds: Rectangle,
         _cursor: mouse::Cursor,
     ) -> Vec<Geometry> {
-        let scale = bounds.width / (self.highest_x + 1.0);
-        let key_size = scale * 0.9;
-
+	let width = 1.0 + self.highest_x - self.lowest_x;
+	let provided = (0.95 * bounds.width).min(500.0);
+	let offset = (bounds.width - provided) / 2.0;
+	let scale = (provided / width);
+	let key_size = scale * 0.9;
+	
         let display = self.cache.draw(renderer, bounds.size(), |frame| {
             for (key, data) in &self.keys {
                 let color = match self.style {
@@ -208,24 +223,24 @@ impl canvas::Program<Message> for LayoutDisplay {
                             Color::from_rgb(0.3, 0.3, 0.3)
                         }
                     }
-		    ColorStyle::Metric => {
-			if let Some(data) = &data {
+                    ColorStyle::Metric => {
+                        if let Some(data) = &data {
                             let f = data.frequency;
                             Color::from_rgb(f / 1.2, f / 1.5, f / 1.0)
                         } else {
                             Color::from_rgb(0.3, 0.3, 0.3)
                         }
-		    }
+                    }
                     ColorStyle::Fingers => color_from_finger(key.finger),
                 };
                 frame.fill_rectangle(
-                    Point::new(scale * key.x, scale * (key.y - self.lowest_y)),
+                    Point::new(offset + scale * key.x, scale * (key.y - self.lowest_y)),
                     Size::new(key_size, key_size),
                     color,
                 );
                 if let Some(data) = data {
                     let mut text = Text::from(data.letter.to_string());
-                    let bx = key.x * scale;
+                    let bx = offset + key.x * scale;
                     let by = (key.y - self.lowest_y) * scale;
                     text.position =
                         Point::new((2.0 * bx + key_size) / 2.0, (2.0 * by + key_size) / 2.0);
