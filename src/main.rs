@@ -21,7 +21,7 @@ use km::{LayoutData, MetricContext};
 use layout_display::{ColorStyle, LayoutDisplay};
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 use std::iter;
 use std::path::PathBuf;
 
@@ -83,9 +83,9 @@ pub struct Keymui {
     base_dirs: BaseDirs,
 
     metric_context: Option<MetricContext>,
-    metric_lists: HashMap<String, PathBuf>,
-    layouts: HashMap<String, LayoutData>,
-    corpora: HashMap<String, PathBuf>,
+    metric_lists: BTreeMap<String, PathBuf>,
+    layouts: BTreeMap<String, LayoutData>,
+    corpora: BTreeMap<String, PathBuf>,
 
     nstrokes_metric: usize,
     nstrokes_list: Vec<(usize, String)>,
@@ -145,9 +145,9 @@ impl Application for Keymui {
             current_corpus: None,
             metric_context: None,
             base_dirs: BaseDirs::new().unwrap(),
-            metric_lists: HashMap::new(),
-            layouts: HashMap::new(),
-            corpora: HashMap::new(),
+            metric_lists: BTreeMap::new(),
+            layouts: BTreeMap::new(),
+            corpora: BTreeMap::new(),
 
             nstrokes_metric: 0,
             nstrokes_list: vec![],
