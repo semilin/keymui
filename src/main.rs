@@ -169,6 +169,7 @@ pub struct Keymui {
 
     nstrokes_metric: usize,
     nstrokes_list: Vec<(usize, String)>,
+    keyboard_size: usize,
 
     config: Config,
 }
@@ -329,6 +330,8 @@ impl Application for Keymui {
             nstrokes_metric: 0,
             nstrokes_list: vec![],
 
+            keyboard_size: 0,
+
             config: Config::default(),
         };
         let e = keymui.load_layouts();
@@ -388,6 +391,51 @@ impl Application for Keymui {
                                 .height(Length::Fill)
                             } else {
                                 container("no layout display available")
+                            },
+                            text("Combos").size(18),
+                            if let Some(context) = &self.metric_context {
+                                container(column(
+                                    context
+                                        .keyboard
+                                        .combo_indexes
+                                        .iter()
+                                        .enumerate()
+                                        .map(|(idx, combo)| {
+                                            Element::from(row![
+                                                text(
+                                                    combo
+                                                        .iter()
+                                                        .map(|i| {
+                                                            context
+                                                                .analyzer
+                                                                .corpus
+                                                                .uncorpus_unigram(
+                                                                    context.analyzer.layouts[0]
+                                                                        .matrix[*i],
+                                                                )
+                                                        })
+                                                        .collect::<String>(),
+                                                )
+                                                .width(Length::Fill),
+                                                text({
+                                                    let mut c =
+                                                        context.analyzer.corpus.uncorpus_unigram(
+                                                            context.analyzer.layouts[0].matrix
+                                                                [self.keyboard_size + idx],
+                                                        );
+                                                    if c == '\0' {
+                                                        c = ' ';
+                                                    }
+                                                    c
+                                                })
+                                                .width(Length::Fill)
+                                            ])
+                                        })
+                                        .collect(),
+                                ))
+                                .height(Length::Fill)
+                            } else {
+                                container("")
                             }
                         ]
                         .spacing(4)
@@ -656,7 +704,7 @@ impl Application for Keymui {
                     }
                 }
                 let _ = self.set_corpus_list();
-		return text_input::focus::<Message>(text_input::Id::new("cmd"));
+                return text_input::focus::<Message>(text_input::Id::new("cmd"));
             }
             Message::CommandInputChanged(s) => {
                 let ns = self.input_completions.len();
@@ -692,7 +740,7 @@ impl Application for Keymui {
             }
             Message::CloseNotifModal => {
                 self.show_notif_modal = false;
-		return text_input::focus::<Message>(text_input::Id::new("cmd"));
+                return text_input::focus::<Message>(text_input::Id::new("cmd"));
             }
             Message::LayoutSelected(s) => {
                 self.current_layout = Some(s);
@@ -720,8 +768,14 @@ impl Application for Keymui {
             }
             Message::SwapKeys(a, b) => {
                 if let Some(ctx) = &mut self.metric_context {
-                    let a = ctx.analyzer.layouts[0].matrix.iter().position(|c| c == ctx.analyzer.corpus.corpus_char(a));
-                    let b = ctx.analyzer.layouts[0].matrix.iter().position(|c| c == ctx.analyzer.corpus.corpus_char(b));
+                    let a = ctx.analyzer.layouts[0]
+                        .matrix
+                        .iter()
+                        .position(|c| c == ctx.analyzer.corpus.corpus_char(a));
+                    let b = ctx.analyzer.layouts[0]
+                        .matrix
+                        .iter()
+                        .position(|c| c == ctx.analyzer.corpus.corpus_char(b));
                     if let (Some(a), Some(b)) = (a, b) {
                         ctx.analyzer.swap(0, &Swap::new(a, b), false);
                         println!("swapped!");
@@ -735,8 +789,7 @@ impl Application for Keymui {
 
                         self.set_nstroke_list();
                         self.sort_nstroke_list();
-                    }
-                    ;
+                    };
                 }
             }
             Message::SetPrecision(n) => {

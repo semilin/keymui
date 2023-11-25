@@ -135,11 +135,15 @@ impl Keymui {
         let s = fs::read_to_string(path).ok()?;
         let corpus: Corpus = serde_json::from_str(&s).ok()?;
 
-        let context = MetricContext::new(
+        let mut context = MetricContext::new(
             self.layouts.get(&self.current_layout.clone()?)?,
             metrics,
             corpus,
         )?;
+
+	context.keyboard.process_combo_indexes();
+
+	self.keyboard_size = context.keyboard.keys.map.iter().flatten().count();
 
         self.layout_display = Some(LayoutDisplay::new(
             &context,
