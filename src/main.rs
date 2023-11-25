@@ -1,8 +1,8 @@
+mod commands;
 mod download;
 mod layout_display;
 mod logic;
-mod commands;
-use commands::{UserCommand, commonest_completion};
+use commands::{commonest_completion, UserCommand};
 use directories::BaseDirs;
 use iced::subscription::events;
 use iced::theme;
@@ -93,7 +93,6 @@ pub struct Keymui {
 
     config: Config,
 }
-
 
 impl Application for Keymui {
     type Executor = executor::Default;
