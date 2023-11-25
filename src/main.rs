@@ -75,7 +75,8 @@ pub enum UserArg {
 
 #[derive(Debug, Clone, Copy)]
 pub enum UserCommand {
-    ImportMetrics,
+    SetMetricsDirectory,
+    ReloadMetrics,
     ImportCorpus,
     ViewNotification,
     Swap,
@@ -86,7 +87,8 @@ pub enum UserCommand {
 impl UserCommand {
     pub fn args(self) -> Vec<UserArg> {
         match self {
-            UserCommand::ImportMetrics => vec![],
+            UserCommand::SetMetricsDirectory => vec![],
+            UserCommand::ReloadMetrics => vec![],
             UserCommand::ImportCorpus => vec![],
             UserCommand::ViewNotification => vec![],
             UserCommand::Swap => vec![UserArg::Key, UserArg::Key],
@@ -99,7 +101,8 @@ impl UserCommand {
 impl std::fmt::Display for UserCommand {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            UserCommand::ImportMetrics => write!(f, "import-metrics"),
+            UserCommand::SetMetricsDirectory => write!(f, "set-metrics-directory"),
+            UserCommand::ReloadMetrics => write!(f, "reload-metrics"),
             UserCommand::ImportCorpus => write!(f, "import-corpus"),
             UserCommand::ViewNotification => write!(f, "view-notification"),
             UserCommand::Swap => write!(f, "swap"),
@@ -132,6 +135,7 @@ impl Default for DisplayStyle {
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
+    metrics_directory: Option<PathBuf>,
     metric_display_styles: HashMap<String, DisplayStyle>,
     stat_precision: u32,
 }
@@ -139,6 +143,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Config {
+            metrics_directory: None,
             metric_display_styles: HashMap::from([
                 ("roll".to_string(), DisplayStyle::Percentage),
                 ("sr-roll".to_string(), DisplayStyle::Percentage),
@@ -205,7 +210,8 @@ impl Keymui {
 
     pub fn run_command(&mut self, cmd: &UserCommand, args: &[&str]) {
         let message = match cmd {
-            UserCommand::ImportMetrics => Some(Message::ImportNewMetrics),
+            UserCommand::SetMetricsDirectory => Some(Message::SetMetricsDirectory),
+            UserCommand::ReloadMetrics => Some(Message::ReloadMetrics),
             UserCommand::ImportCorpus => Some(Message::ImportNewCorpus),
             UserCommand::ViewNotification => Some(Message::ViewNotification),
             UserCommand::Swap => {
@@ -287,7 +293,7 @@ impl Application for Keymui {
             panes.split(Axis::Vertical, &pane.0, Pane::new(PaneKind::Metrics));
         }
 
-	panes.split(
+        panes.split(
             Axis::Horizontal,
             panes
                 .panes
@@ -303,7 +309,8 @@ impl Application for Keymui {
         );
 
         let commands = vec![
-            UserCommand::ImportMetrics,
+            UserCommand::SetMetricsDirectory,
+            UserCommand::ReloadMetrics,
             UserCommand::ImportCorpus,
             UserCommand::ViewNotification,
             UserCommand::Swap,
@@ -670,25 +677,24 @@ impl Application for Keymui {
 
     fn update(&mut self, message: Message) -> Command<Message> {
         match message {
-            Message::ImportNewMetrics => {
+            Message::SetMetricsDirectory => {
                 let dir = FileDialog::new()
                     .set_directory(self.base_dirs.home_dir())
                     .pick_folder();
                 if let Some(dir) = dir {
-                    match self.import_metrics(dir) {
-                        Ok(_) => {
-                            self.notification =
-                                ("successfully imported metric data".to_string(), None)
-                        }
-                        Err(e) => {
-                            self.notification = (
-                                "error importing metric data".to_string(),
-                                Some(e.to_string()),
-                            )
-                        }
-                    };
+                    self.config.metrics_directory = Some(dir);
+                    self.notification = ("successfully set metric directory".to_string(), None);
                 };
                 return text_input::focus::<Message>(text_input::Id::new("cmd"));
+            }
+            Message::ReloadMetrics => {
+                let result = self.import_metrics();
+                match result {
+                    Ok(()) => self.notification = ("metrics loaded successfully".to_string(), None),
+                    Err(e) => self.notification = (e.to_string(), None),
+                }
+                let _ = self.set_metric_list();
+                self.load_data();
             }
             Message::ImportNewCorpus => {
                 let file = FileDialog::new()
@@ -838,7 +844,8 @@ impl Application for Keymui {
 
 #[derive(Clone, Debug)]
 pub enum Message {
-    ImportNewMetrics,
+    SetMetricsDirectory,
+    ReloadMetrics,
     ImportNewCorpus,
     CommandInputChanged(String),
     CommandSubmitted,

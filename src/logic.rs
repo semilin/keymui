@@ -1,8 +1,8 @@
+use crate::download;
 use crate::layout_display::{ColorStyle, LayoutDisplay};
 use crate::Keymui;
-use crate::download;
-use directories::BaseDirs;
 use anyhow::{anyhow, Result};
+use directories::BaseDirs;
 use kc::Corpus;
 use km::{self, MetricContext};
 use std::ffi::OsStr;
@@ -14,7 +14,7 @@ pub fn initial_setup() {
     let base_dirs = BaseDirs::new().unwrap();
     let data_dir = base_dirs.data_dir().join("keymeow");
     if data_dir.exists() {
-	return;
+        return;
     }
     fs::create_dir_all(&data_dir.join("layouts")).unwrap();
     fs::create_dir_all(&data_dir.join("corpora")).unwrap();
@@ -87,9 +87,14 @@ impl Keymui {
         Ok(())
     }
 
-    pub fn import_metrics(&mut self, dir: PathBuf) -> Result<()> {
+    pub fn import_metrics(&mut self) -> Result<()> {
         let mut added = false;
-        for entry in fs::read_dir(dir)? {
+        let path: &PathBuf = self
+            .config
+            .metrics_directory
+            .as_ref()
+            .ok_or(anyhow!("no metrics directory set"))?;
+        for entry in fs::read_dir(path)? {
             let entry = entry?;
             let path = entry.path();
 
@@ -155,9 +160,9 @@ impl Keymui {
             corpus,
         )?;
 
-	context.keyboard.process_combo_indexes();
+        context.keyboard.process_combo_indexes();
 
-	self.keyboard_size = context.keyboard.keys.map.iter().flatten().count();
+        self.keyboard_size = context.keyboard.keys.map.iter().flatten().count();
 
         self.layout_display = Some(LayoutDisplay::new(
             &context,
