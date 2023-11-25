@@ -235,7 +235,7 @@ impl Keymui {
                         .map(|arg| {
                             let chars: Vec<usize> = arg
                                 .chars()
-                                .flat_map(|c| corpus.corpus_char(c))
+                                .map(|c| corpus.corpus_char(c))
                                 .cloned()
                                 .collect();
                             let freqs: [u32; 2] = match &chars[..] {
@@ -656,6 +656,7 @@ impl Application for Keymui {
                     }
                 }
                 let _ = self.set_corpus_list();
+		return text_input::focus::<Message>(text_input::Id::new("cmd"));
             }
             Message::CommandInputChanged(s) => {
                 let ns = self.input_completions.len();
@@ -691,6 +692,7 @@ impl Application for Keymui {
             }
             Message::CloseNotifModal => {
                 self.show_notif_modal = false;
+		return text_input::focus::<Message>(text_input::Id::new("cmd"));
             }
             Message::LayoutSelected(s) => {
                 self.current_layout = Some(s);
@@ -718,27 +720,23 @@ impl Application for Keymui {
             }
             Message::SwapKeys(a, b) => {
                 if let Some(ctx) = &mut self.metric_context {
-                    if let (Some(a), Some(b)) = (
-                        ctx.analyzer.corpus.corpus_char(a),
-                        ctx.analyzer.corpus.corpus_char(b),
-                    ) {
-                        let a = ctx.analyzer.layouts[0].matrix.iter().position(|c| c == a);
-                        let b = ctx.analyzer.layouts[0].matrix.iter().position(|c| c == b);
-                        if let (Some(a), Some(b)) = (a, b) {
-                            ctx.analyzer.swap(0, &Swap::new(a, b), false);
-                            println!("swapped!");
-                            let display = self
-                                .layout_display
-                                .as_mut()
-                                .expect("analyzer exists, therefore layout display should");
+                    let a = ctx.analyzer.layouts[0].matrix.iter().position(|c| c == ctx.analyzer.corpus.corpus_char(a));
+                    let b = ctx.analyzer.layouts[0].matrix.iter().position(|c| c == ctx.analyzer.corpus.corpus_char(b));
+                    if let (Some(a), Some(b)) = (a, b) {
+                        ctx.analyzer.swap(0, &Swap::new(a, b), false);
+                        println!("swapped!");
+                        let display = self
+                            .layout_display
+                            .as_mut()
+                            .expect("analyzer exists, therefore layout display should");
 
-                            display.update_keys(ctx, self.nstrokes_metric);
-                            display.redraw();
+                        display.update_keys(ctx, self.nstrokes_metric);
+                        display.redraw();
 
-                            self.set_nstroke_list();
-                            self.sort_nstroke_list();
-                        }
-                    };
+                        self.set_nstroke_list();
+                        self.sort_nstroke_list();
+                    }
+                    ;
                 }
             }
             Message::SetPrecision(n) => {
