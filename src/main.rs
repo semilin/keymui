@@ -394,7 +394,7 @@ impl Application for Keymui {
                             },
                             text("Combos").size(18),
                             if let Some(context) = &self.metric_context {
-                                container(column(
+                                container(scrollable(column(
                                     context
                                         .keyboard
                                         .combo_indexes
@@ -432,7 +432,7 @@ impl Application for Keymui {
                                             ])
                                         })
                                         .collect(),
-                                ))
+                                )))
                                 .height(Length::Fill)
                             } else {
                                 container("")
