@@ -70,11 +70,28 @@ impl Keymui {
             .map(|c| vec![c, c.to_uppercase().next().unwrap()])
             .collect::<Vec<Vec<char>>>();
         char_list.extend(vec![
+	    vec![' '],
             vec![',', '<'],
             vec!['.', '>'],
             vec!['/', '?'],
             vec!['\'', '"'],
             vec![';', ':'],
+	    vec!['1', '!'],
+	    vec!['2', '@'],
+	    vec!['3', '#'],
+	    vec!['4', '$'],
+	    vec!['5', '%'],
+	    vec!['6', '^'],
+	    vec!['7', '&'],
+	    vec!['8', '*'],
+	    vec!['9', '('],
+	    vec!['0', ')'],
+	    vec!['-', '_'],
+	    vec!['=', '+'],
+	    vec!['[', '{'],
+	    vec![']', '}'],
+	    vec!['\\', '|'],
+	    vec!['`', '~'],
         ]);
         let mut corpus = Corpus::with_char_list(&mut char_list);
 
