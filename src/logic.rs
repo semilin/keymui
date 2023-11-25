@@ -62,7 +62,7 @@ impl Keymui {
             vec!['\'', '"'],
             vec![';', ':'],
         ]);
-        let mut corpus = Corpus::with_char_list(char_list);
+        let mut corpus = Corpus::with_char_list(&mut char_list);
 
         corpus.add_file(&file)?;
 
@@ -78,7 +78,6 @@ impl Keymui {
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
-            println!("{:?}", path.extension());
 
             match path.extension() {
                 Some(ext) => {

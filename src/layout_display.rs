@@ -131,7 +131,10 @@ impl LayoutDisplay {
                 (
                     kc.clone(),
                     Some(KeyData {
-                        letter: corpus.uncorpus_unigram(*c),
+                        letter: match corpus.uncorpus_unigram(*c) {
+			    '\0' => ' ',
+			    _ => corpus.uncorpus_unigram(*c),
+			},
                         frequency: match style {
                             ColorStyle::Frequency => freqs[i],
                             ColorStyle::Metric => freqs[i],
