@@ -74,7 +74,7 @@ pub struct Keymui {
     panes: pane_grid::State<Pane>,
     commands: Vec<UserCommand>,
     command_input: String,
-    input_options: Vec<String>,
+    input_options: Vec<(UserCommand, String)>,
     input_completions: Vec<usize>,
     current_layout: Option<String>,
     current_metrics: Option<String>,
@@ -169,7 +169,11 @@ impl Application for Keymui {
         keymui.current_corpus = keymui.corpora.keys().next().cloned();
         keymui.load_data();
         let _ = keymui.load_config();
-        keymui.input_options = keymui.commands.iter().map(|c| c.to_string()).collect();
+        keymui.input_options = keymui
+            .commands
+            .iter()
+            .map(|c| (*c, c.to_string()))
+            .collect();
 
         keymui.filter_commands();
         (
@@ -516,19 +520,32 @@ impl Application for Keymui {
             Message::CommandInputChanged(s) => {
                 let ns = self.input_completions.len();
                 if ns > 0 && s.ends_with(' ') {
-                    let common_idx = commonest_completion(
-                        &self
-                            .input_completions
-                            .iter()
-                            .map(|x| self.input_options[*x].as_ref())
-                            .collect(),
-                    );
-                    let common = &self.input_options[self.input_completions[0]][..common_idx];
-                    self.command_input = if common == self.command_input {
+                    let priority: Vec<&str> = self
+                        .input_completions
+                        .iter()
+                        .map(|i| &self.input_options[*i])
+                        .filter(|(c, _)| c.is_priority())
+                        .map(|(_, s)| s.as_str())
+                        .collect();
+
+                    let completed = if priority.len() == 1 {
+                        priority[0]
+                    } else {
+                        let common_idx = commonest_completion(
+                            &self
+                                .input_completions
+                                .iter()
+                                .map(|x| self.input_options[*x].1.as_ref())
+                                .collect(),
+                        );
+                        &self.input_options[self.input_completions[0]].1[..common_idx]
+                    };
+
+                    self.command_input = if false {
                         s
                     } else {
-                        let mut s = common.to_string();
-                        if ns == 1 {
+                        let mut s = completed.to_string();
+                        if ns == 1 || priority.len() == 1 {
                             s.extend(iter::once(' '));
                         }
                         s
@@ -586,10 +603,17 @@ impl Application for Keymui {
                         .iter()
                         .position(|c| c == ctx.analyzer.corpus.corpus_char(b));
                     if let (Some(a), Some(b)) = (a, b) {
-			let swap = Swap::new(a, b);
-			let diffs = ctx.analyzer.swap_diff(vec![0.0; ctx.analyzer.data.metrics.len()], &ctx.layout, &swap);
+                        let swap = Swap::new(a, b);
+                        let diffs = ctx.analyzer.swap_diff(
+                            vec![0.0; ctx.analyzer.data.metrics.len()],
+                            &ctx.layout,
+                            &swap,
+                        );
                         ctx.layout.swap(&swap);
-			self.layout_stats.iter_mut().zip(diffs.iter()).for_each(|(v, diff)| *v += diff);
+                        self.layout_stats
+                            .iter_mut()
+                            .zip(diffs.iter())
+                            .for_each(|(v, diff)| *v += diff);
                         println!("swapped!");
                         let display = self
                             .layout_display

@@ -31,6 +31,12 @@ impl UserCommand {
             UserCommand::NgramFrequency => vec![UserArg::String, UserArg::String],
         }
     }
+    pub fn is_priority(self) -> bool {
+        match self {
+            UserCommand::Swap => true,
+            _ => false,
+        }
+    }
 }
 
 impl std::fmt::Display for UserCommand {
@@ -59,19 +65,19 @@ pub fn linear_matches(src: &str, target: &str) -> bool {
     true
 }
 
-pub fn match_list(src: &str, choices: &Vec<String>) -> Vec<usize> {
-    choices
-        .iter()
-        .enumerate()
-        .filter_map(|(i, c)| {
-            if linear_matches(src, c) {
-                Some(i)
-            } else {
-                None
-            }
-        })
-        .collect()
-}
+// pub fn match_list(src: &str, choices: &Vec<String>) -> Vec<usize> {
+//     choices
+//         .iter()
+//         .enumerate()
+//         .filter_map(|(i, c)| {
+//             if linear_matches(src, c) {
+//                 Some(i)
+//             } else {
+//                 None
+//             }
+//         })
+//         .collect()
+// }
 
 pub fn commonest_completion(matches: &Vec<&str>) -> usize {
     if matches.len() == 0 {
@@ -186,6 +192,17 @@ impl Keymui {
     }
 
     pub fn filter_commands(&mut self) {
-        self.input_completions = match_list(&self.command_input, &self.input_options);
+        self.input_completions = self
+            .input_options
+            .iter()
+            .enumerate()
+            .filter_map(|(i, (_, s))| {
+                if linear_matches(&self.command_input, s) {
+                    Some(i)
+                } else {
+                    None
+                }
+            })
+            .collect();
     }
 }
