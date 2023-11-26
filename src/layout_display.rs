@@ -74,7 +74,7 @@ impl LayoutDisplay {
         metric: usize,
     ) -> Vec<(KeyCoord, Option<KeyData>)> {
         let kb = &ctx.keyboard;
-        let l = &ctx.analyzer.layouts[0];
+        let l = &ctx.layout;
         let corpus = &ctx.analyzer.corpus;
         let freqs: Vec<f32> = match style {
             ColorStyle::Frequency => {
@@ -85,7 +85,7 @@ impl LayoutDisplay {
                     .collect()
             }
             ColorStyle::Metric => {
-                let counts: Vec<f32> = (0..ctx.analyzer.layouts[0].matrix.len())
+                let counts: Vec<f32> = (0..ctx.layout.matrix.len())
                     .map(|p| {
                         let sum: f32 = ctx
                             .analyzer
@@ -99,7 +99,7 @@ impl LayoutDisplay {
                             })
                             .map(|(ns, am)| {
                                 am.amount
-                                    * ctx.analyzer.layouts[0].frequency(
+                                    * ctx.layout.frequency(
                                         &ctx.analyzer.corpus,
                                         &ns,
                                         Some(ctx.metrics[metric].ngram_type),
@@ -205,12 +205,12 @@ impl canvas::Program<Message> for LayoutDisplay {
         bounds: Rectangle,
         _cursor: mouse::Cursor,
     ) -> Vec<Geometry> {
-	let width = 1.0 + self.highest_x - self.lowest_x;
-	let provided = (0.95 * bounds.width).min(500.0);
-	let offset = (bounds.width - provided) / 2.0;
-	let scale = provided / width;
-	let key_size = scale * 0.9;
-	
+        let width = 1.0 + self.highest_x - self.lowest_x;
+        let provided = (0.95 * bounds.width).min(500.0);
+        let offset = (bounds.width - provided) / 2.0;
+        let scale = provided / width;
+        let key_size = scale * 0.9;
+
         let display = self.cache.draw(renderer, bounds.size(), |frame| {
             for (key, data) in &self.keys {
                 let color = match self.style {

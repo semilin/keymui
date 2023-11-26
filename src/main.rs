@@ -21,7 +21,7 @@ use km::{LayoutData, MetricContext};
 use layout_display::{ColorStyle, LayoutDisplay};
 use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{BTreeMap, HashMap};
 use std::iter;
 use std::path::PathBuf;
 
@@ -83,6 +83,7 @@ pub struct Keymui {
     base_dirs: BaseDirs,
 
     metric_context: Option<MetricContext>,
+    layout_stats: Vec<f32>,
     metric_lists: BTreeMap<String, PathBuf>,
     layouts: BTreeMap<String, LayoutData>,
     corpora: BTreeMap<String, PathBuf>,
@@ -144,6 +145,7 @@ impl Application for Keymui {
             current_metrics: None,
             current_corpus: None,
             metric_context: None,
+            layout_stats: vec![],
             base_dirs: BaseDirs::new().unwrap(),
             metric_lists: BTreeMap::new(),
             layouts: BTreeMap::new(),
@@ -232,8 +234,7 @@ impl Application for Keymui {
                                                                 .analyzer
                                                                 .corpus
                                                                 .uncorpus_unigram(
-                                                                    context.analyzer.layouts[0]
-                                                                        .matrix[*i],
+                                                                    context.layout.matrix[*i],
                                                                 )
                                                         })
                                                         .collect::<String>(),
@@ -242,7 +243,7 @@ impl Application for Keymui {
                                                 text({
                                                     let mut c =
                                                         context.analyzer.corpus.uncorpus_unigram(
-                                                            context.analyzer.layouts[0].matrix
+                                                            context.layout.matrix
                                                                 [self.keyboard_size + idx],
                                                         );
                                                     if c == '\0' {
@@ -285,9 +286,8 @@ impl Application for Keymui {
                             .width(Length::FillPortion(1)),
                         ],
                         if let Some(context) = &self.metric_context {
-                            let char_count = context.analyzer.layouts[0]
-                                .total_char_count(&context.analyzer.corpus)
-                                as f32;
+                            let char_count =
+                                context.layout.total_char_count(&context.analyzer.corpus) as f32;
                             scrollable(column(
                                 context
                                     .metrics
@@ -314,12 +314,12 @@ impl Application for Keymui {
                                                             "{}/{:.0}",
                                                             self.config.stat_precision,
                                                             self.config.stat_precision as f32
-                                                                / (context.analyzer.stats[i]
+                                                                / (self.layout_stats[i]
                                                                     / char_count)
                                                         ),
                                                         DisplayStyle::Percentage => format!(
                                                             "{:.2}%",
-                                                            100.0 * context.analyzer.stats[i]
+                                                            100.0 * self.layout_stats[i]
                                                                 / char_count
                                                         ),
                                                     }
@@ -330,19 +330,6 @@ impl Application for Keymui {
                                                 .style(theme::Button::Text)
                                                 .padding(0)
                                             )
-                                            .width(Length::FillPortion(1)),
-                                            container(text({
-                                                let diff = context.analyzer.stat_diffs[i];
-                                                if diff == 0.0 {
-                                                    "".to_string()
-                                                } else {
-                                                    format!(
-                                                        "{:+.2}%",
-                                                        100.0 * diff
-                                                            / (context.analyzer.stats[i] - diff)
-                                                    )
-                                                }
-                                            }))
                                             .width(Length::FillPortion(1)),
                                         ])
                                     })
@@ -356,9 +343,8 @@ impl Application for Keymui {
                     .into(),
                     PaneKind::Nstrokes => {
                         if let Some(ctx) = &self.metric_context {
-                            let char_count = ctx.analyzer.layouts[0]
-                                .total_char_count(&ctx.analyzer.corpus)
-                                as f32;
+                            let char_count =
+                                ctx.layout.total_char_count(&ctx.analyzer.corpus) as f32;
                             column![
                                 text(if self.nstrokes_list.len() == 0 {
                                     "".to_string()
@@ -381,7 +367,7 @@ impl Application for Keymui {
                                                         container(text(format!(
                                                             "{:.2}%",
                                                             100.0
-                                                                * ctx.analyzer.layouts[0].frequency(
+                                                                * ctx.layout.frequency(
                                                                     &ctx.analyzer.corpus,
                                                                     &ctx.analyzer.data.strokes[n.0]
                                                                         .nstroke,
@@ -589,16 +575,21 @@ impl Application for Keymui {
             }
             Message::SwapKeys(a, b) => {
                 if let Some(ctx) = &mut self.metric_context {
-                    let a = ctx.analyzer.layouts[0]
+                    let a = ctx
+                        .layout
                         .matrix
                         .iter()
                         .position(|c| c == ctx.analyzer.corpus.corpus_char(a));
-                    let b = ctx.analyzer.layouts[0]
+                    let b = ctx
+                        .layout
                         .matrix
                         .iter()
                         .position(|c| c == ctx.analyzer.corpus.corpus_char(b));
                     if let (Some(a), Some(b)) = (a, b) {
-                        ctx.analyzer.swap(0, &Swap::new(a, b), false);
+			let swap = Swap::new(a, b);
+			let diffs = ctx.analyzer.swap_diff(vec![0.0; ctx.analyzer.data.metrics.len()], &ctx.layout, &swap);
+                        ctx.layout.swap(&swap);
+			self.layout_stats.iter_mut().zip(diffs.iter()).for_each(|(v, diff)| *v += diff);
                         println!("swapped!");
                         let display = self
                             .layout_display

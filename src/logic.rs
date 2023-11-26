@@ -70,28 +70,28 @@ impl Keymui {
             .map(|c| vec![c, c.to_uppercase().next().unwrap()])
             .collect::<Vec<Vec<char>>>();
         char_list.extend(vec![
-	    vec![' '],
+            vec![' '],
             vec![',', '<'],
             vec!['.', '>'],
             vec!['/', '?'],
             vec!['\'', '"'],
             vec![';', ':'],
-	    vec!['1', '!'],
-	    vec!['2', '@'],
-	    vec!['3', '#'],
-	    vec!['4', '$'],
-	    vec!['5', '%'],
-	    vec!['6', '^'],
-	    vec!['7', '&'],
-	    vec!['8', '*'],
-	    vec!['9', '('],
-	    vec!['0', ')'],
-	    vec!['-', '_'],
-	    vec!['=', '+'],
-	    vec!['[', '{'],
-	    vec![']', '}'],
-	    vec!['\\', '|'],
-	    vec!['`', '~'],
+            vec!['1', '!'],
+            vec!['2', '@'],
+            vec!['3', '#'],
+            vec!['4', '$'],
+            vec!['5', '%'],
+            vec!['6', '^'],
+            vec!['7', '&'],
+            vec!['8', '*'],
+            vec!['9', '('],
+            vec!['0', ')'],
+            vec!['-', '_'],
+            vec!['=', '+'],
+            vec!['[', '{'],
+            vec![']', '}'],
+            vec!['\\', '|'],
+            vec!['`', '~'],
         ]);
         let mut corpus = Corpus::with_char_list(&mut char_list);
 
@@ -177,6 +177,13 @@ impl Keymui {
             corpus,
         )?;
 
+        self.layout_stats.clear();
+        self.layout_stats
+            .resize(context.analyzer.data.metrics.len(), 0.0);
+        self.layout_stats = context
+            .analyzer
+            .calc_stats(self.layout_stats.clone(), &context.layout);
+
         context.keyboard.process_combo_indexes();
 
         self.keyboard_size = context.keyboard.keys.map.iter().flatten().count();
@@ -221,7 +228,7 @@ impl Keymui {
                 {
                     self.nstrokes_list.push((
                         i,
-                        ctx.analyzer.layouts[0]
+                        ctx.layout
                             .nstroke_chars(&ctx.analyzer.data.strokes[i].nstroke)
                             .iter()
                             .map(|c| ctx.analyzer.corpus.uncorpus_unigram(*c))
@@ -236,7 +243,7 @@ impl Keymui {
         if let Some(ctx) = &self.metric_context {
             let an = &ctx.analyzer;
             self.nstrokes_list.sort_by_key(|i| {
-                an.layouts[0].frequency(
+                ctx.layout.frequency(
                     &an.corpus,
                     &an.data.strokes[i.0].nstroke,
                     Some(an.data.metrics[self.nstrokes_metric]),
