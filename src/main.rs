@@ -487,6 +487,7 @@ impl Application for Keymui {
                 if let Some(dir) = dir {
                     self.config.metrics_directory = Some(dir);
                     self.notification = ("successfully set metric directory".to_string(), None);
+		    let _ = self.save_config();
                 };
                 return text_input::focus::<Message>(text_input::Id::new("cmd"));
             }
