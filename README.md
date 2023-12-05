@@ -4,19 +4,19 @@ not ready yet, but I think it's rather exciting and should be useable
 fairly soon.
 
 ## features / roadmap
-- [x] GUI written in [Iced](https://github.com/iced-rs/iced)
+- [x] Cross platform GUI written in [Iced](https://github.com/iced-rs/iced)
+  - [ ] Web version
 - [x] ability to import custom metrics and keyboards from [km_metrics](https://github.com/semilin/km_metrics)
 - [x] flexible layouts adaptable to multiple kinds of keyboards
 - [x] multiple modes of layout visualization
+- [x] nstroke list and visualization for any metric
 - [ ] keyboard-driven interface (partially implemented)
-- [ ] nstroke list and visualization for any metric
 - [ ] fast layout optimization with cached analysis through [keycat](https://github.com/semilin/)
 - [ ] tree-based interactive layout development workflow
 
 ## installation
-I don't really recommend trying keymui in its current state, as it's
-not very useful yet. But if you want to get a headstart on exploring
-its features, here's how you can.
+Keymui is now pretty usable out of the box. Just download the source
+and build it. The only dependency is the Rust compiler.
 
 ### build from source
 ```sh
@@ -25,27 +25,27 @@ cd keymui
 cargo r --release
 ```
 
-## setup
-Again, since keymui is in its early stages, this is an unpleasant
-process.
+## extra setup
+### metrics
+Analyzing with the default metrics is nice, but Keymui's real killer
+feature is the ability to create your own metrics and keyboards. This
+requires some additional setup.
 
-First, clone [km_metrics](https://github.com/semilin/km_metrics). Then
-run `python3 main.py` in its directory.
+First, clone [km_metrics](https://github.com/semilin/km_metrics).
 
-In keymui, run the `import-metrics` command and select the `export`
-folder in your `km_metrics` directory.
+Run `python3 main.py` to export the metrics.
 
-Then run the `import-corpus` command and select a text file you'd like
-to use as a corpus.
+In keymui, run the `set-metrics-directory` command and select the
+`export` folder in your `km_metrics` directory.
 
-Finally, you need layouts. The only way to add them currently is to
-put them directly in keymeow's data directory. On Linux, this is
+### layouts
+Adding/editing layouts is annoying at the moment because Keymui stores
+layouts in a non-obvious place. On Linux, this is
 `$XDG_DATA_DIR/keymeow/layouts/` (`XDG_DATA_DIR` defaulting to
-`$HOME/.local/share`). On other platforms, it's wherever application
-data is supposed to go on that platform. You can find sample layouts
-in `keymui/layouts`.
+`$HOME/.local/share`). On Windows, this is `%APPDATA%\Roaming\keymeow\layouts\`
 
-Now that you've gone through that incredibly intuitive and friendly
-process, you can now do... well, not much. The most worthwhile thing
-to do at this point is check out the codebase of `km_metrics` and try
-writing some of your own metrics and keyboards.
+In the future, a system will be added for storing layouts in a
+directory of your choice.
+
+### corpora
+Just run the `import-corpus` command and select a text file. 
