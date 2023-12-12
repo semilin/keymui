@@ -12,8 +12,8 @@ use iced::widget::{
 };
 use iced::window;
 use iced::{
-    alignment, executor, Application, Command, Element, Event, Length, Settings, Subscription,
-    Theme,
+    alignment, executor, Application, Command, Element, Event, Font, Length, Settings,
+    Subscription, Theme,
 };
 use iced_aw::{modal, Card};
 use kc::Swap;
@@ -243,6 +243,7 @@ impl Application for Keymui {
                                                         })
                                                         .collect::<String>(),
                                                 )
+                                                .font(Font::MONOSPACE)
                                                 .width(Length::Fill),
                                                 text({
                                                     let mut c =
@@ -255,6 +256,7 @@ impl Application for Keymui {
                                                     }
                                                     c
                                                 })
+                                                .font(Font::MONOSPACE)
                                                 .width(Length::Fill)
                                             ])
                                         })
@@ -364,9 +366,10 @@ impl Application for Keymui {
                                             Element::from(
                                                 container(
                                                     row![
-                                                        container(text(
-                                                            self.nstrokes_list[i].1.clone()
-                                                        ))
+                                                        container(
+                                                            text(self.nstrokes_list[i].1.clone())
+                                                                .font(Font::MONOSPACE)
+                                                        )
                                                         .width(Length::FillPortion(1)),
                                                         container(text(format!(
                                                             "{:.2}%",
@@ -487,7 +490,7 @@ impl Application for Keymui {
                 if let Some(dir) = dir {
                     self.config.metrics_directory = Some(dir);
                     self.notification = ("successfully set metric directory".to_string(), None);
-		    let _ = self.save_config();
+                    let _ = self.save_config();
                 };
                 return text_input::focus::<Message>(text_input::Id::new("cmd"));
             }
