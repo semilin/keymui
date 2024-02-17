@@ -4,6 +4,7 @@ mod layout_display;
 mod logic;
 use commands::{commonest_completion, UserCommand};
 use directories::BaseDirs;
+use iced::event::{self, Event};
 use iced::theme;
 use iced::widget::pane_grid::{self, Axis, PaneGrid};
 use iced::widget::{
@@ -11,8 +12,7 @@ use iced::widget::{
 };
 use iced::window;
 use iced::{
-    alignment, executor, Application, Command, Element, Event, Font, Length, Settings,
-    Subscription, Theme,
+    alignment, executor, Application, Command, Element, Font, Length, Settings, Subscription, Theme,
 };
 use iced_aw::{modal, Card};
 use kc::Swap;
@@ -224,12 +224,8 @@ impl Application for Keymui {
                             text("Combos").size(18),
                             if let Some(context) = &self.metric_context {
                                 container(scrollable(column(
-                                    context
-                                        .keyboard
-                                        .combo_indexes
-                                        .iter()
-                                        .enumerate()
-                                        .map(|(idx, combo)| {
+                                    context.keyboard.combo_indexes.iter().enumerate().map(
+                                        |(idx, combo)| {
                                             Element::from(row![
                                                 text(
                                                     combo
@@ -260,8 +256,8 @@ impl Application for Keymui {
                                                 .font(Font::MONOSPACE)
                                                 .width(Length::Fill)
                                             ])
-                                        })
-                                        .collect(),
+                                        },
+                                    ),
                                 )))
                                 .height(Length::Fill)
                             } else {
@@ -295,53 +291,44 @@ impl Application for Keymui {
                         if let Some(context) = &self.metric_context {
                             let char_count =
                                 context.layout.total_char_count(&context.analyzer.corpus) as f32;
-                            scrollable(column(
-                                context
-                                    .metrics
-                                    .iter()
-                                    .enumerate()
-                                    .map(|(i, m)| {
-                                        Element::from(row![
-                                            container(
-                                                button(text(m.name.clone()))
-                                                    .on_press(Message::SetNstrokesMetric(i))
-                                                    .style(theme::Button::Text)
-                                                    .padding(0)
-                                            )
-                                            .width(Length::FillPortion(3)),
-                                            container(
-                                                button(text(
-                                                    match self
-                                                        .config
-                                                        .metric_display_styles
-                                                        .get(&context.metrics[i].short)
-                                                        .unwrap_or(&DisplayStyle::Ratio)
-                                                    {
-                                                        DisplayStyle::Ratio => format!(
-                                                            "{}/{:.0}",
-                                                            self.config.stat_precision,
-                                                            self.config.stat_precision as f32
-                                                                / (self.layout_stats[i]
-                                                                    / char_count)
-                                                        ),
-                                                        DisplayStyle::Percentage => format!(
-                                                            "{:.2}%",
-                                                            100.0 * self.layout_stats[i]
-                                                                / char_count
-                                                        ),
-                                                    }
-                                                ))
-                                                .on_press(Message::ToggleDisplayStyle(
-                                                    context.metrics[i].short.clone()
-                                                ))
-                                                .style(theme::Button::Text)
-                                                .padding(0)
-                                            )
-                                            .width(Length::FillPortion(1)),
-                                        ])
-                                    })
-                                    .collect(),
-                            ))
+                            scrollable(column(context.metrics.iter().enumerate().map(|(i, m)| {
+                                Element::from(row![
+                                    container(
+                                        button(text(m.name.clone()))
+                                            .on_press(Message::SetNstrokesMetric(i))
+                                            .style(theme::Button::Text)
+                                            .padding(0)
+                                    )
+                                    .width(Length::FillPortion(3)),
+                                    container(
+                                        button(text(
+                                            match self
+                                                .config
+                                                .metric_display_styles
+                                                .get(&context.metrics[i].short)
+                                                .unwrap_or(&DisplayStyle::Ratio)
+                                            {
+                                                DisplayStyle::Ratio => format!(
+                                                    "{}/{:.0}",
+                                                    self.config.stat_precision,
+                                                    self.config.stat_precision as f32
+                                                        / (self.layout_stats[i] / char_count)
+                                                ),
+                                                DisplayStyle::Percentage => format!(
+                                                    "{:.2}%",
+                                                    100.0 * self.layout_stats[i] / char_count
+                                                ),
+                                            }
+                                        ))
+                                        .on_press(Message::ToggleDisplayStyle(
+                                            context.metrics[i].short.clone()
+                                        ))
+                                        .style(theme::Button::Text)
+                                        .padding(0)
+                                    )
+                                    .width(Length::FillPortion(1)),
+                                ])
+                            })))
                         } else {
                             scrollable(text("no metrics available!"))
                         }
@@ -359,43 +346,39 @@ impl Application for Keymui {
                                     ctx.metrics[self.nstrokes_metric].name.clone()
                                 })
                                 .size(18),
-                                scrollable(column(
-                                    self.nstrokes_list
-                                        .iter()
-                                        .enumerate()
-                                        .map(|(i, n)| {
-                                            Element::from(
-                                                container(
-                                                    row![
-                                                        container(
-                                                            text(self.nstrokes_list[i].1.clone())
-                                                                .font(Font::MONOSPACE)
-                                                        )
-                                                        .width(Length::FillPortion(1)),
-                                                        container(text(format!(
-                                                            "{:.2}%",
-                                                            100.0
-                                                                * ctx.layout.frequency(
-                                                                    &ctx.analyzer.corpus,
-                                                                    &ctx.analyzer.data.strokes[n.0]
-                                                                        .nstroke,
-                                                                    Some(
-                                                                        ctx.analyzer.data.metrics
-                                                                            [self.nstrokes_metric]
-                                                                    ),
-                                                                )
-                                                                    as f32
-                                                                / char_count
-                                                        )))
-                                                        .width(Length::FillPortion(1))
-                                                    ]
-                                                    .width(Length::Fill),
-                                                )
+                                scrollable(column(self.nstrokes_list.iter().enumerate().map(
+                                    |(i, n)| {
+                                        Element::from(
+                                            container(
+                                                row![
+                                                    container(
+                                                        text(self.nstrokes_list[i].1.clone())
+                                                            .font(Font::MONOSPACE)
+                                                    )
+                                                    .width(Length::FillPortion(1)),
+                                                    container(text(format!(
+                                                        "{:.2}%",
+                                                        100.0
+                                                            * ctx.layout.frequency(
+                                                                &ctx.analyzer.corpus,
+                                                                &ctx.analyzer.data.strokes[n.0]
+                                                                    .nstroke,
+                                                                Some(
+                                                                    ctx.analyzer.data.metrics
+                                                                        [self.nstrokes_metric]
+                                                                ),
+                                                            )
+                                                                as f32
+                                                            / char_count
+                                                    )))
+                                                    .width(Length::FillPortion(1))
+                                                ]
                                                 .width(Length::Fill),
                                             )
-                                        })
-                                        .collect(),
-                                ))
+                                            .width(Length::Fill),
+                                        )
+                                    }
+                                )))
                             ]
                             .spacing(5)
                             .into()
@@ -413,8 +396,7 @@ impl Application for Keymui {
             self.input_completions
                 .iter()
                 .take(5)
-                .map(|i| Element::from(text(&self.commands[*i].to_string())))
-                .collect(),
+                .map(|i| Element::from(text(&self.commands[*i].to_string()))),
         ))
         .height(Length::FillPortion(2))
         .align_y(alignment::Vertical::Bottom);
@@ -483,7 +465,7 @@ impl Application for Keymui {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        events().map(|x| Message::RuntimeEvent(x))
+        event::listen().map(|x| Message::RuntimeEvent(x))
     }
 
     fn update(&mut self, message: Message) -> Command<Message> {
