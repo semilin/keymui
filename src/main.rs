@@ -104,14 +104,13 @@ impl Application for Keymui {
     fn new(_flags: ()) -> (Self, Command<Self::Message>) {
         let (mut panes, _) = pane_grid::State::new(Pane::new(PaneKind::Layout));
         for pane in panes.panes.clone() {
-            panes.split(Axis::Vertical, &pane.0, Pane::new(PaneKind::Metrics));
+            panes.split(Axis::Vertical, pane.0, Pane::new(PaneKind::Metrics));
         }
 
         panes.split(
             Axis::Horizontal,
-            panes
+            *panes
                 .panes
-                .clone()
                 .iter()
                 .find(|p| match p.1.kind {
                     PaneKind::Metrics => true,
