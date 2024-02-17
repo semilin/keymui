@@ -459,16 +459,20 @@ impl Application for Keymui {
             .center_x()
             .into();
 
-        let notif_modal = container(Card::new(
-            "Notification Details",
-            if let Some(s) = &self.notification.1 {
-                s
-            } else {
-                ""
-            },
-        ));
+        let notif_modal = if self.show_notif_modal {
+            Some(container(Card::new(
+                "Notification Details",
+                if let Some(s) = &self.notification.1 {
+                    s
+                } else {
+                    ""
+                },
+            )))
+        } else {
+            None
+        };
 
-        modal(self.show_notif_modal, view, notif_modal)
+        modal(view, notif_modal)
             .backdrop(Message::CloseNotifModal)
             .on_esc(Message::CloseNotifModal)
             .into()
