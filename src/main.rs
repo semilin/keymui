@@ -591,7 +591,7 @@ impl Application for Keymui {
                 }
             }
             Message::Resized(pane_grid::ResizeEvent { split, ratio }) => {
-                self.panes.resize(&split, ratio);
+                self.panes.resize(split, ratio);
             }
             Message::SwapKeys(a, b) => {
                 if let Some(ctx) = &mut self.metric_context {
