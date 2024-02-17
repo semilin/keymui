@@ -246,7 +246,7 @@ impl canvas::Program<Message> for LayoutDisplay {
                         Point::new((2.0 * bx + key_size) / 2.0, (2.0 * by + key_size) / 2.0);
                     text.horizontal_alignment = Horizontal::Center;
                     text.vertical_alignment = Vertical::Center;
-                    text.size = 0.5 * scale;
+                    text.size = iced::Pixels(0.5 * scale);
                     frame.fill_text(text)
                 }
             }
