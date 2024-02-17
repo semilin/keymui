@@ -4,7 +4,6 @@ mod layout_display;
 mod logic;
 use commands::{commonest_completion, UserCommand};
 use directories::BaseDirs;
-use iced::subscription::events;
 use iced::theme;
 use iced::widget::pane_grid::{self, Axis, PaneGrid};
 use iced::widget::{
@@ -29,7 +28,10 @@ pub fn main() -> iced::Result {
     logic::initial_setup();
     Keymui::run(Settings {
         antialiasing: true,
-        exit_on_close_request: false,
+        window: iced::window::Settings {
+            exit_on_close_request: false,
+            ..Default::default()
+        },
         ..Settings::default()
     })
 }
@@ -648,9 +650,9 @@ impl Application for Keymui {
                 }
             }
             Message::RuntimeEvent(e) => match e {
-                Event::Window(window::Event::CloseRequested) => {
+                Event::Window(id, window::Event::CloseRequested) => {
                     let _ = self.save_config();
-                    return window::close();
+                    return window::close(id);
                 }
                 _ => (),
             },
