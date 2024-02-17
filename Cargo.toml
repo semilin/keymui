@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 iced = {version = "0.12.0", features = ["lazy", "canvas"]}
-iced_aw = {version = "0.6.0", default-features = false, features = ["card", "modal"]}
+iced_aw = {git = "https://github.com/iced-rs/iced_aw", default-features = false, features = ["card", "modal"]}
 km = {package = "keymeow", git = "https://github.com/semilin/keymeow"}
 kc = {package = "keycat", git = "https://github.com/semilin/keycat"}
 rfd = {version = "0.11.4"}
