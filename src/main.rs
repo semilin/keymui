@@ -89,7 +89,7 @@ pub struct Keymui {
     corpora: BTreeMap<String, PathBuf>,
 
     nstrokes_metric: usize,
-    nstrokes_list: Vec<(usize, String)>,
+    nstrokes_list: Vec<(usize, String, f32)>,
     keyboard_size: usize,
 
     config: Config,
@@ -349,8 +349,6 @@ impl Application for Keymui {
                     .into(),
                     PaneKind::Nstrokes => {
                         if let Some(ctx) = &self.metric_context {
-                            let char_count =
-                                ctx.layout.total_char_count(&ctx.analyzer.corpus) as f32;
                             column![
                                 text(if self.nstrokes_list.len() == 0 {
                                     "".to_string()
@@ -361,32 +359,14 @@ impl Application for Keymui {
                                 scrollable(column(
                                     self.nstrokes_list
                                         .iter()
-                                        .enumerate()
-                                        .map(|(i, n)| {
+                                        .map(|n| {
                                             Element::from(
                                                 container(
                                                     row![
-                                                        container(
-                                                            text(self.nstrokes_list[i].1.clone())
-                                                                .font(Font::MONOSPACE)
-                                                        )
-                                                        .width(Length::FillPortion(1)),
-                                                        container(text(format!(
-                                                            "{:.2}%",
-                                                            100.0
-                                                                * ctx.layout.frequency(
-                                                                    &ctx.analyzer.corpus,
-                                                                    &ctx.analyzer.data.strokes[n.0]
-                                                                        .nstroke,
-                                                                    Some(
-                                                                        ctx.analyzer.data.metrics
-                                                                            [self.nstrokes_metric]
-                                                                    ),
-                                                                )
-                                                                    as f32
-                                                                / char_count
-                                                        )))
-                                                        .width(Length::FillPortion(1))
+                                                        container(text(&n.1).font(Font::MONOSPACE))
+                                                            .width(Length::FillPortion(1)),
+                                                        container(text(format!("{:.2}%", &n.2)))
+                                                            .width(Length::FillPortion(1))
                                                     ]
                                                     .width(Length::Fill),
                                                 )

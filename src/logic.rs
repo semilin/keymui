@@ -220,19 +220,27 @@ impl Keymui {
     pub fn set_nstroke_list(&mut self) {
         if let Some(ctx) = &self.metric_context {
             self.nstrokes_list = Vec::with_capacity(ctx.analyzer.data.strokes.len() / 3);
+            let char_count = ctx.layout.total_char_count(&ctx.analyzer.corpus) as f32;
             for (i, stroke) in ctx.analyzer.data.strokes.iter().enumerate() {
                 if stroke
                     .amounts
                     .iter()
                     .any(|m| m.metric == self.nstrokes_metric)
                 {
+                    let count = ctx.layout.frequency(
+                        &ctx.analyzer.corpus,
+                        &stroke.nstroke,
+                        Some(ctx.analyzer.data.metrics[self.nstrokes_metric]),
+                    );
+                    let freq_display = 100.0 * (count as f32) / char_count;
                     self.nstrokes_list.push((
                         i,
                         ctx.layout
-                            .nstroke_chars(&ctx.analyzer.data.strokes[i].nstroke)
+                            .nstroke_chars(&stroke.nstroke)
                             .iter()
                             .map(|c| ctx.analyzer.corpus.uncorpus_unigram(*c))
                             .collect::<String>(),
+                        freq_display,
                     ));
                 }
             }
