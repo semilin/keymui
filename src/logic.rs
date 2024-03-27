@@ -6,8 +6,7 @@ use directories::BaseDirs;
 use kc::Corpus;
 use km::{self, MetricContext};
 use std::ffi::OsStr;
-use std::fs::{self, File};
-use std::io::Write;
+use std::fs;
 use std::path::PathBuf;
 
 pub fn initial_setup() {
@@ -97,10 +96,10 @@ impl Keymui {
 
         corpus.add_file(&file)?;
 
-        let text = serde_json::to_string(&corpus)?;
+        let bin = rmp_serde::to_vec(&corpus)?;
         let mut new_path = cdir.join(file.file_stem().ok_or(anyhow!("couldn't get path stem"))?);
-        new_path.set_extension("json");
-        write!(File::create(new_path)?, "{}", text)?;
+        new_path.set_extension("corpus");
+        fs::write(new_path, bin)?;
         Ok(())
     }
 
@@ -117,7 +116,7 @@ impl Keymui {
 
             match path.extension() {
                 Some(ext) => {
-                    if ext != OsStr::new("json") {
+                    if ext != OsStr::new("metrics") {
                         continue;
                     }
                     let name = &path
@@ -131,8 +130,8 @@ impl Keymui {
                     let mdir = self.base_dirs.data_dir().join("keymeow").join("metrics");
                     let newpath =
                         mdir.join(path.file_name().ok_or(anyhow!("couldn't get filename"))?);
-                    let s = fs::read_to_string(&path)?;
-                    fs::write(newpath, s)?;
+                    let b = fs::read(&path)?;
+                    fs::write(newpath, b)?;
                 }
                 None => continue,
             };
@@ -163,13 +162,13 @@ impl Keymui {
 
     pub fn load_data(&mut self) -> Option<()> {
         let path = self.metric_lists.get(&self.current_metrics.clone()?)?;
-        let s = fs::read_to_string(path).ok()?;
-        let metrics: km::MetricData = serde_json::from_str(&s).ok()?;
+        let b = fs::read(path).ok()?;
+        let metrics: km::MetricData = rmp_serde::from_slice(&b).ok()?;
 
         let corpus = self.current_corpus.clone()?;
         let path = self.corpora.get(&corpus)?;
-        let s = fs::read_to_string(path).ok()?;
-        let corpus: Corpus = serde_json::from_str(&s).ok()?;
+        let b = fs::read(path).ok()?;
+        let corpus: Corpus = rmp_serde::from_slice(&b).ok()?;
 
         let mut context = MetricContext::new(
             self.layouts.get(&self.current_layout.clone()?)?,
