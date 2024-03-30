@@ -232,6 +232,9 @@ impl Keymui {
                         &stroke.nstroke,
                         Some(ctx.analyzer.data.metrics[self.nstrokes_metric]),
                     );
+                    if i > 100 && count as f32 / char_count * 100.0 < 0.002 {
+                        continue
+                    }
                     let freq_display = 100.0 * (count as f32) / char_count;
                     self.nstrokes_list.push((
                         i,
