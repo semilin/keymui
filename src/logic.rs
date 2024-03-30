@@ -1,7 +1,7 @@
 use crate::download;
 use crate::layout_display::{ColorStyle, LayoutDisplay};
 use crate::Keymui;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Result, Context};
 use directories::BaseDirs;
 use kc::Corpus;
 use km::{self, MetricContext};
@@ -160,21 +160,22 @@ impl Keymui {
         Ok(())
     }
 
-    pub fn load_data(&mut self) -> Option<()> {
-        let path = self.metric_lists.get(&self.current_metrics.clone()?)?;
-        let b = fs::read(path).ok()?;
-        let metrics: km::MetricData = rmp_serde::from_slice(&b).ok()?;
+    pub fn load_data(&mut self) -> Result<()> {
+        let path = self.metric_lists.get(&self.current_metrics.clone().context("no metrics selected")?).context("metric data doesn't exist")?;
+        println!("{:?}", path);
+        let b = fs::read(path).context("couldn't read metrics file")?;
+        let metrics: km::MetricData = rmp_serde::from_slice(&b).context("couldn't deserialize metrics")?;
 
-        let corpus = self.current_corpus.clone()?;
-        let path = self.corpora.get(&corpus)?;
-        let b = fs::read(path).ok()?;
-        let corpus: Corpus = rmp_serde::from_slice(&b).ok()?;
+        let corpus = self.current_corpus.clone().context("no corpus selected")?;
+        let path = self.corpora.get(&corpus).context("corpus doesn't exist")?;
+        let b = fs::read(path).context("couldn't read corpus file")?;
+        let corpus: Corpus = rmp_serde::from_slice(&b).context("couldn't deserialize corpus")?;
 
         let mut context = MetricContext::new(
-            self.layouts.get(&self.current_layout.clone()?)?,
+            self.layouts.get(&self.current_layout.clone().context("no layout selected")?).context("layout doesn't exist")?,
             metrics,
             corpus,
-        )?;
+        ).context("couldn't create metric context from selection")?;
 
         self.layout_stats.clear();
         self.layout_stats
@@ -197,7 +198,7 @@ impl Keymui {
         self.set_nstroke_list();
         self.sort_nstroke_list();
 
-        Some(())
+        Ok(())
     }
 
     pub fn set_metric_list(&mut self) -> Result<()> {

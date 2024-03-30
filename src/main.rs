@@ -167,8 +167,12 @@ impl Application for Keymui {
         keymui.current_layout = keymui.layouts.keys().next().cloned();
         keymui.current_metrics = keymui.metric_lists.keys().next().cloned();
         keymui.current_corpus = keymui.corpora.keys().next().cloned();
-        keymui.load_data();
-        let _ = keymui.load_config();
+        if let Err(e) = keymui.load_data() {
+            println!("{:?}", e);
+        }
+        if let Err(e) = keymui.load_config() {
+            println!("{:?}", e);
+        }
         keymui.input_options = keymui
             .commands
             .iter()
@@ -481,7 +485,9 @@ impl Application for Keymui {
                     Err(e) => self.notification = (e.to_string(), None),
                 }
                 let _ = self.set_metric_list();
-                self.load_data();
+                if let Err(e) = self.load_data() {
+                    println!("{:?}", e);
+                }
             }
             Message::ImportNewCorpus => {
                 let file = FileDialog::new()
@@ -552,15 +558,15 @@ impl Application for Keymui {
             }
             Message::LayoutSelected(s) => {
                 self.current_layout = Some(s);
-                self.load_data();
+                let _ = self.load_data();
             }
             Message::ContextSelected(s) => {
                 self.current_metrics = Some(s);
-                self.load_data();
+                let _ = self.load_data();
             }
             Message::CorpusSelected(s) => {
                 self.current_corpus = Some(s);
-                self.load_data();
+                let _ = self.load_data();
             }
             Message::DisplayStyleSet(style) => {
                 if let Some(display) = &mut self.layout_display {
