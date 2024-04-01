@@ -1,7 +1,7 @@
 use crate::download;
 use crate::layout_display::{ColorStyle, LayoutDisplay};
 use crate::Keymui;
-use anyhow::{anyhow, Result, Context};
+use anyhow::{anyhow, Context, Result};
 use directories::BaseDirs;
 use kc::Corpus;
 use km::{self, MetricContext};
@@ -34,7 +34,10 @@ impl Keymui {
         let cdir = self.config_dir();
         fs::create_dir_all(&cdir)?;
         let path = cdir.join("config.json");
-        self.config = serde_json::from_str(&fs::read_to_string(path)?)?;
+        self.config = serde_json::from_str(&fs::read_to_string(&path).context(format!(
+            "couldn't read config file from path {}",
+            &path.display()
+        ))?).context("couldn't parse config file")?;
         Ok(())
     }
 
@@ -42,17 +45,20 @@ impl Keymui {
         let cdir = self.config_dir();
         let path = cdir.join("config.json");
         let s = serde_json::to_string(&self.config)?;
-        fs::write(path, s)?;
+        fs::write(&path, s)
+            .context(format!("couldn't write config file to {}", &path.display()))?;
         Ok(())
     }
 
     pub fn load_layouts(&mut self) -> Result<()> {
         let ldir = self.data_dir().join("layouts");
         fs::create_dir_all(&ldir)?;
-        for entry in fs::read_dir(ldir)? {
+        for entry in fs::read_dir(ldir).context("couldn't read layouts directory")? {
             let path = entry?.path();
-            let s = fs::read_to_string(path)?;
-            let layout: km::LayoutData = serde_json::from_str(&s)?;
+            let s = fs::read_to_string(&path)
+                .with_context(|| format!("couldn't read file {}", &path.display()))?;
+            let layout: km::LayoutData = serde_json::from_str(&s)
+                .with_context(|| format!("couldn't parse layout file {}", &path.display()))?;
             self.layouts
                 .insert(layout.name.clone().to_lowercase().replace(' ', "-"), layout);
         }
@@ -110,7 +116,7 @@ impl Keymui {
             .metrics_directory
             .as_ref()
             .ok_or(anyhow!("no metrics directory set"))?;
-        for entry in fs::read_dir(path)? {
+        for entry in fs::read_dir(path).context("couldn't read metrics directory")? {
             let entry = entry?;
             let path = entry.path();
 
@@ -130,8 +136,12 @@ impl Keymui {
                     let mdir = self.base_dirs.data_dir().join("keymeow").join("metrics");
                     let newpath =
                         mdir.join(path.file_name().ok_or(anyhow!("couldn't get filename"))?);
-                    let b = fs::read(&path)?;
-                    fs::write(newpath, b)?;
+                    let b = fs::read(&path).with_context(|| {
+                        format!("couldn't read metrics file {}", &path.display())
+                    })?;
+                    fs::write(&newpath, b).with_context(|| {
+                        format!("couldn't write metrics to {}", &newpath.display())
+                    })?;
                 }
                 None => continue,
             };
@@ -148,7 +158,7 @@ impl Keymui {
         let cdir = self.data_dir().join("corpora");
         fs::create_dir_all(&cdir)?;
 
-        for entry in fs::read_dir(cdir)? {
+        for entry in fs::read_dir(cdir).context("couldn't read corpus directory")? {
             let path = entry?.path();
             let name = path
                 .file_stem()
@@ -161,10 +171,18 @@ impl Keymui {
     }
 
     pub fn load_data(&mut self) -> Result<()> {
-        let path = self.metric_lists.get(&self.current_metrics.clone().context("no metrics selected")?).context("metric data doesn't exist")?;
-        println!("{:?}", path);
+        let path = self
+            .metric_lists
+            .get(
+                &self
+                    .current_metrics
+                    .clone()
+                    .context("no metrics selected")?,
+            )
+            .context("metric data doesn't exist")?;
         let b = fs::read(path).context("couldn't read metrics file")?;
-        let metrics: km::MetricData = rmp_serde::from_slice(&b).context("couldn't deserialize metrics")?;
+        let metrics: km::MetricData =
+            rmp_serde::from_slice(&b).context("couldn't deserialize metrics")?;
 
         let corpus = self.current_corpus.clone().context("no corpus selected")?;
         let path = self.corpora.get(&corpus).context("corpus doesn't exist")?;
@@ -172,10 +190,13 @@ impl Keymui {
         let corpus: Corpus = rmp_serde::from_slice(&b).context("couldn't deserialize corpus")?;
 
         let mut context = MetricContext::new(
-            self.layouts.get(&self.current_layout.clone().context("no layout selected")?).context("layout doesn't exist")?,
+            self.layouts
+                .get(&self.current_layout.clone().context("no layout selected")?)
+                .context("layout doesn't exist")?,
             metrics,
             corpus,
-        ).context("couldn't create metric context from selection")?;
+        )
+        .context("couldn't create metric context from selection")?;
 
         self.layout_stats.clear();
         self.layout_stats
@@ -233,7 +254,7 @@ impl Keymui {
                         Some(ctx.analyzer.data.metrics[self.nstrokes_metric]),
                     );
                     if i > 100 && count as f32 / char_count * 100.0 < 0.002 {
-                        continue
+                        continue;
                     }
                     let freq_display = 100.0 * (count as f32) / char_count;
                     self.nstrokes_list.push((
