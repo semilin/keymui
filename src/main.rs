@@ -26,6 +26,7 @@ use std::iter;
 use std::path::PathBuf;
 
 pub fn main() -> iced::Result {
+    color_eyre::install().unwrap();
     logic::initial_setup();
     Keymui::run(Settings {
         antialiasing: true,

@@ -1,7 +1,7 @@
 use crate::download;
 use crate::layout_display::{ColorStyle, LayoutDisplay};
 use crate::Keymui;
-use anyhow::{anyhow, Context, Result};
+use color_eyre::eyre::{anyhow, Context, ContextCompat, Result};
 use directories::BaseDirs;
 use kc::Corpus;
 use km::{self, MetricContext};
