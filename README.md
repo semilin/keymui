@@ -38,6 +38,10 @@ Run `python3 main.py` to export the metrics.
 In keymui, run the `set-metrics-directory` command and select the
 `export` folder in your `km_metrics` directory.
 
+In order to refresh the metrics, run the `reload-metrics` command in
+keymui. You should do this every time you successfully export in
+km_metrics.
+
 ### layouts
 Adding/editing layouts is annoying at the moment because Keymui stores
 layouts in a non-obvious place. On Linux, this is
