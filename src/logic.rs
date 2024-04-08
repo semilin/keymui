@@ -267,7 +267,7 @@ impl Keymui {
                             .map(|c| ctx.analyzer.corpus.uncorpus_unigram(*c))
                             .collect::<String>(),
                         freq_display,
-			amt.amount
+                        amt.amount,
                     ));
                 }
             }

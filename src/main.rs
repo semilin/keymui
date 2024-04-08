@@ -719,7 +719,7 @@ impl Application for Keymui {
                         },
                     );
                 };
-		self.sort_nstroke_list();
+                self.sort_nstroke_list();
             }
             Message::RuntimeEvent(e) => match e {
                 Event::Window(window::Event::CloseRequested) => {
