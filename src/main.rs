@@ -35,28 +35,18 @@ pub fn main() -> iced::Result {
     })
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub enum DisplayStyle {
+    #[default]
     Ratio,
     Percentage,
 }
 
-impl Default for DisplayStyle {
-    fn default() -> Self {
-        DisplayStyle::Ratio
-    }
-}
-
-#[derive(Serialize, Deserialize, Copy, Clone)]
+#[derive(Serialize, Deserialize, Default, Copy, Clone)]
 pub enum NstrokeSortMethod {
+    #[default]
     Frequency,
     Value,
-}
-
-impl Default for NstrokeSortMethod {
-    fn default() -> Self {
-        NstrokeSortMethod::Frequency
-    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -169,10 +159,7 @@ impl Application for Keymui {
                 .panes
                 .clone()
                 .iter()
-                .find(|p| match p.1.kind {
-                    PaneKind::Metrics => true,
-                    _ => false,
-                })
+                .find(|p| matches!(p.1.kind, PaneKind::Metrics))
                 .unwrap()
                 .0,
             Pane::new(PaneKind::Nstrokes),
@@ -412,7 +399,7 @@ impl Application for Keymui {
                         if let Some(ctx) = &self.metric_context {
                             column![
                                 button(
-                                    text(if self.nstrokes_list.len() == 0 {
+                                    text(if self.nstrokes_list.is_empty() {
                                         "".to_string()
                                     } else {
                                         ctx.metrics[self.nstrokes_metric].name.clone()
@@ -530,7 +517,7 @@ impl Application for Keymui {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        events().map(|x| Message::RuntimeEvent(x))
+        events().map(Message::RuntimeEvent)
     }
 
     fn update(&mut self, message: Message) -> Command<Message> {
@@ -590,8 +577,7 @@ impl Application for Keymui {
                         priority[0]
                     } else {
                         let common_idx = commonest_completion(
-                            &self
-                                .input_completions
+                            self.input_completions
                                 .iter()
                                 .map(|x| self.input_options[*x].1.as_ref())
                                 .collect(),
@@ -724,6 +710,7 @@ impl Application for Keymui {
                 };
                 self.sort_nstroke_list();
             }
+            #[allow(clippy::single_match)]
             Message::RuntimeEvent(e) => match e {
                 Event::Window(window::Event::CloseRequested) => {
                     let _ = self.save_config();
@@ -740,7 +727,7 @@ impl Application for Keymui {
                         .metric_context
                         .as_ref()
                         .expect("display exists, therefore context should");
-                    display.update_keys(&ctx, self.nstrokes_metric);
+                    display.update_keys(ctx, self.nstrokes_metric);
                     display.redraw();
                 }
             }

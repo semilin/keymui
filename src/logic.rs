@@ -15,9 +15,9 @@ pub fn initial_setup() {
     if data_dir.exists() {
         return;
     }
-    fs::create_dir_all(&data_dir.join("layouts")).unwrap();
-    fs::create_dir_all(&data_dir.join("corpora")).unwrap();
-    fs::create_dir_all(&data_dir.join("metrics")).unwrap();
+    fs::create_dir_all(data_dir.join("layouts")).unwrap();
+    fs::create_dir_all(data_dir.join("corpora")).unwrap();
+    fs::create_dir_all(data_dir.join("metrics")).unwrap();
     let _ = download::download_files(&data_dir);
 }
 
@@ -247,8 +247,7 @@ impl Keymui {
                 let amount = stroke
                     .amounts
                     .iter()
-                    .filter(|m| m.metric == self.nstrokes_metric)
-                    .next();
+                    .find(|m| m.metric == self.nstrokes_metric);
                 if let Some(amt) = amount {
                     let count = ctx.layout.frequency(
                         &ctx.analyzer.corpus,

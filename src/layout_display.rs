@@ -93,15 +93,17 @@ impl LayoutDisplay {
                             .strokes
                             .iter()
                             .filter(|data| data.nstroke.to_vec().contains(&p))
-                            .filter_map(|s| match s.amounts.iter().find(|am| am.metric == metric) {
-                                Some(am) => Some((&s.nstroke, am)),
-                                None => None,
+                            .filter_map(|s| {
+                                s.amounts
+                                    .iter()
+                                    .find(|am| am.metric == metric)
+                                    .map(|am| (&s.nstroke, am))
                             })
                             .map(|(ns, am)| {
                                 am.amount
                                     * ctx.layout.frequency(
                                         &ctx.analyzer.corpus,
-                                        &ns,
+                                        ns,
                                         Some(ctx.metrics[metric].ngram_type),
                                     ) as f32
                             })
