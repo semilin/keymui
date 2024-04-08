@@ -45,7 +45,7 @@ impl Keymui {
     pub fn save_config(&self) -> Result<()> {
         let cdir = self.config_dir();
         let path = cdir.join("config.json");
-        let s = serde_json::to_string(&self.config)?;
+        let s = serde_json::to_string_pretty(&self.config)?;
         fs::write(&path, s)
             .context(format!("couldn't write config file to {}", &path.display()))?;
         Ok(())
