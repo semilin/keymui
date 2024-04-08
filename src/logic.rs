@@ -1,6 +1,6 @@
-use crate::download;
 use crate::layout_display::{ColorStyle, LayoutDisplay};
 use crate::Keymui;
+use crate::{download, NstrokeSortMethod};
 use color_eyre::eyre::{anyhow, Context, ContextCompat, Result};
 use directories::BaseDirs;
 use kc::Corpus;
@@ -37,7 +37,8 @@ impl Keymui {
         self.config = serde_json::from_str(&fs::read_to_string(&path).context(format!(
             "couldn't read config file from path {}",
             &path.display()
-        ))?).context("couldn't parse config file")?;
+        ))?)
+        .context("couldn't parse config file")?;
         Ok(())
     }
 
@@ -243,11 +244,12 @@ impl Keymui {
             self.nstrokes_list = Vec::with_capacity(ctx.analyzer.data.strokes.len() / 3);
             let char_count = ctx.layout.total_char_count(&ctx.analyzer.corpus) as f32;
             for (i, stroke) in ctx.analyzer.data.strokes.iter().enumerate() {
-                if stroke
+                let amount = stroke
                     .amounts
                     .iter()
-                    .any(|m| m.metric == self.nstrokes_metric)
-                {
+                    .filter(|m| m.metric == self.nstrokes_metric)
+                    .next();
+                if let Some(amt) = amount {
                     let count = ctx.layout.frequency(
                         &ctx.analyzer.corpus,
                         &stroke.nstroke,
@@ -265,6 +267,7 @@ impl Keymui {
                             .map(|c| ctx.analyzer.corpus.uncorpus_unigram(*c))
                             .collect::<String>(),
                         freq_display,
+			amt.amount
                     ));
                 }
             }
@@ -273,13 +276,15 @@ impl Keymui {
 
     pub fn sort_nstroke_list(&mut self) {
         if let Some(ctx) = &self.metric_context {
-            let an = &ctx.analyzer;
-            self.nstrokes_list.sort_by_key(|i| {
-                ctx.layout.frequency(
-                    &an.corpus,
-                    &an.data.strokes[i.0].nstroke,
-                    Some(an.data.metrics[self.nstrokes_metric]),
-                )
+            let method = self
+                .config
+                .metric_display_styles
+                .get(&ctx.metrics[self.nstrokes_metric].short)
+                .map(|x| x.nstroke_sort_method)
+                .unwrap_or_default();
+            self.nstrokes_list.sort_by(|a, b| match method {
+                NstrokeSortMethod::Frequency => a.2.partial_cmp(&b.2).unwrap(),
+                NstrokeSortMethod::Value => b.3.partial_cmp(&b.3).unwrap(),
             });
             self.nstrokes_list.reverse();
         }

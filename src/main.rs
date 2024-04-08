@@ -47,11 +47,32 @@ impl Default for DisplayStyle {
     }
 }
 
+#[derive(Serialize, Deserialize, Copy, Clone)]
+pub enum NstrokeSortMethod {
+    Frequency,
+    Value,
+}
+
+impl Default for NstrokeSortMethod {
+    fn default() -> Self {
+        NstrokeSortMethod::Frequency
+    }
+}
+
 #[derive(Serialize, Deserialize)]
+#[serde(default)]
 pub struct Config {
     metrics_directory: Option<PathBuf>,
-    metric_display_styles: HashMap<String, DisplayStyle>,
+    metric_display_styles: HashMap<String, MetricDisplayConfig>,
     stat_precision: u32,
+    use_monospace: bool,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct MetricDisplayConfig {
+    display_style: DisplayStyle,
+    nstroke_sort_method: NstrokeSortMethod,
 }
 
 impl Default for Config {
@@ -59,12 +80,37 @@ impl Default for Config {
         Config {
             metrics_directory: None,
             metric_display_styles: HashMap::from([
-                ("roll".to_string(), DisplayStyle::Percentage),
-                ("sr-roll".to_string(), DisplayStyle::Percentage),
-                ("alt".to_string(), DisplayStyle::Percentage),
-                ("redir".to_string(), DisplayStyle::Percentage),
+                (
+                    "roll".to_string(),
+                    MetricDisplayConfig {
+                        display_style: DisplayStyle::Percentage,
+                        ..MetricDisplayConfig::default()
+                    },
+                ),
+                (
+                    "sr-roll".to_string(),
+                    MetricDisplayConfig {
+                        display_style: DisplayStyle::Percentage,
+                        ..MetricDisplayConfig::default()
+                    },
+                ),
+                (
+                    "alt".to_string(),
+                    MetricDisplayConfig {
+                        display_style: DisplayStyle::Percentage,
+                        ..MetricDisplayConfig::default()
+                    },
+                ),
+                (
+                    "redir".to_string(),
+                    MetricDisplayConfig {
+                        display_style: DisplayStyle::Percentage,
+                        ..MetricDisplayConfig::default()
+                    },
+                ),
             ]),
             stat_precision: 1,
+            use_monospace: true,
         }
     }
 }
@@ -90,10 +136,19 @@ pub struct Keymui {
     corpora: BTreeMap<String, PathBuf>,
 
     nstrokes_metric: usize,
-    nstrokes_list: Vec<(usize, String, f32)>,
+    nstrokes_list: Vec<(usize, String, f32, f32)>,
     keyboard_size: usize,
 
     config: Config,
+}
+
+impl Keymui {
+    pub fn monospaced_font(&self) -> Font {
+        match self.config.use_monospace {
+            true => Font::MONOSPACE,
+            false => Font::DEFAULT,
+        }
+    }
 }
 
 impl Application for Keymui {
@@ -248,7 +303,7 @@ impl Application for Keymui {
                                                         })
                                                         .collect::<String>(),
                                                 )
-                                                .font(Font::MONOSPACE)
+                                                .font(self.monospaced_font())
                                                 .width(Length::Fill),
                                                 text({
                                                     let mut c =
@@ -261,7 +316,7 @@ impl Application for Keymui {
                                                     }
                                                     c
                                                 })
-                                                .font(Font::MONOSPACE)
+                                                .font(self.monospaced_font())
                                                 .width(Length::Fill)
                                             ])
                                         })
@@ -319,7 +374,8 @@ impl Application for Keymui {
                                                         .config
                                                         .metric_display_styles
                                                         .get(&context.metrics[i].short)
-                                                        .unwrap_or(&DisplayStyle::Ratio)
+                                                        .unwrap_or(&MetricDisplayConfig::default())
+                                                        .display_style
                                                     {
                                                         DisplayStyle::Ratio => format!(
                                                             "{}/{:.0}",
@@ -355,12 +411,18 @@ impl Application for Keymui {
                     PaneKind::Nstrokes => {
                         if let Some(ctx) = &self.metric_context {
                             column![
-                                text(if self.nstrokes_list.len() == 0 {
-                                    "".to_string()
-                                } else {
-                                    ctx.metrics[self.nstrokes_metric].name.clone()
-                                })
-                                .size(18),
+                                button(
+                                    text(if self.nstrokes_list.len() == 0 {
+                                        "".to_string()
+                                    } else {
+                                        ctx.metrics[self.nstrokes_metric].name.clone()
+                                    })
+                                    .size(18),
+                                )
+                                .on_press(Message::ToggleSortMethod(
+                                    ctx.metrics[self.nstrokes_metric].short.clone()
+                                ))
+                                .style(theme::Button::Text),
                                 scrollable(column(
                                     self.nstrokes_list
                                         .iter()
@@ -368,8 +430,10 @@ impl Application for Keymui {
                                             Element::from(
                                                 container(
                                                     row![
-                                                        container(text(&n.1).font(Font::MONOSPACE))
-                                                            .width(Length::FillPortion(1)),
+                                                        container(
+                                                            text(&n.1).font(self.monospaced_font())
+                                                        )
+                                                        .width(Length::FillPortion(1)),
                                                         container(text(format!("{:.2}%", &n.2)))
                                                             .width(Length::FillPortion(1))
                                                     ]
@@ -623,17 +687,39 @@ impl Application for Keymui {
                 self.config.stat_precision = n;
             }
             Message::ToggleDisplayStyle(s) => {
-                let style = self.config.metric_display_styles.get_mut(&s);
-                if let Some(style) = style {
-                    *style = match style {
+                let conf = self.config.metric_display_styles.get_mut(&s);
+                if let Some(conf) = conf {
+                    conf.display_style = match conf.display_style {
                         DisplayStyle::Ratio => DisplayStyle::Percentage,
                         DisplayStyle::Percentage => DisplayStyle::Ratio,
                     }
                 } else {
-                    self.config
-                        .metric_display_styles
-                        .insert(s, DisplayStyle::Percentage);
+                    self.config.metric_display_styles.insert(
+                        s,
+                        MetricDisplayConfig {
+                            display_style: DisplayStyle::Percentage,
+                            ..MetricDisplayConfig::default()
+                        },
+                    );
                 }
+            }
+            Message::ToggleSortMethod(s) => {
+                let conf = self.config.metric_display_styles.get_mut(&s);
+                if let Some(conf) = conf {
+                    conf.nstroke_sort_method = match conf.nstroke_sort_method {
+                        NstrokeSortMethod::Frequency => NstrokeSortMethod::Value,
+                        NstrokeSortMethod::Value => NstrokeSortMethod::Frequency,
+                    }
+                } else {
+                    self.config.metric_display_styles.insert(
+                        s,
+                        MetricDisplayConfig {
+                            nstroke_sort_method: NstrokeSortMethod::Value,
+                            ..MetricDisplayConfig::default()
+                        },
+                    );
+                };
+		self.sort_nstroke_list();
             }
             Message::RuntimeEvent(e) => match e {
                 Event::Window(window::Event::CloseRequested) => {
@@ -678,6 +764,7 @@ pub enum Message {
     SwapKeys(char, char),
     SetPrecision(u32),
     ToggleDisplayStyle(String),
+    ToggleSortMethod(String),
     SetNstrokesMetric(usize),
     RuntimeEvent(Event),
 }
