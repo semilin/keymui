@@ -255,9 +255,6 @@ impl Keymui {
                         &stroke.nstroke,
                         Some(ctx.analyzer.data.metrics[self.nstrokes_metric]),
                     );
-                    if i > 100 && count as f32 / char_count * 100.0 < 0.002 {
-                        continue;
-                    }
                     let freq_display = 100.0 * (count as f32) / char_count;
                     self.nstrokes_list.push((
                         i,
@@ -284,7 +281,7 @@ impl Keymui {
                 .unwrap_or_default();
             self.nstrokes_list.sort_by(|a, b| match method {
                 NstrokeSortMethod::Frequency => a.2.partial_cmp(&b.2).unwrap(),
-                NstrokeSortMethod::Value => b.3.partial_cmp(&b.3).unwrap(),
+                NstrokeSortMethod::Value => a.3.partial_cmp(&b.3).unwrap(),
             });
             self.nstrokes_list.reverse();
         }

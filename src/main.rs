@@ -426,6 +426,7 @@ impl Application for Keymui {
                                 scrollable(column(
                                     self.nstrokes_list
                                         .iter()
+                                        .take(100)
                                         .map(|n| {
                                             Element::from(
                                                 container(
@@ -435,7 +436,9 @@ impl Application for Keymui {
                                                         )
                                                         .width(Length::FillPortion(1)),
                                                         container(text(format!("{:.2}%", &n.2)))
-                                                            .width(Length::FillPortion(1))
+                                                            .width(Length::FillPortion(1)),
+                                                        container(text(format!("{:.3}", &n.3)))
+                                                            .width(Length::FillPortion(1)),
                                                     ]
                                                     .width(Length::Fill),
                                                 )
