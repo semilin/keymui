@@ -134,10 +134,7 @@ impl LayoutDisplay {
                 (
                     kc.clone(),
                     Some(KeyData {
-                        letter: match corpus.uncorpus_unigram(*c) {
-                            '\0' => ' ',
-                            _ => corpus.uncorpus_unigram(*c),
-                        },
+                        letter: corpus.uncorpus_unigram(*c),
                         frequency: match style {
                             ColorStyle::Frequency => freqs[i],
                             ColorStyle::Metric => freqs[i],
@@ -241,7 +238,11 @@ impl canvas::Program<Message> for LayoutDisplay {
                     color,
                 );
                 if let Some(data) = data {
-                    let mut text = Text::from(data.letter.to_string());
+                    let mut text = Text::from(match data.letter {
+			' ' => "␣".to_string(),
+			'\0' => "".to_string(),
+			_ => data.letter.to_string()
+		    });
                     let bx = offset + key.x * scale;
                     let by = (key.y - self.lowest_y) * scale;
                     text.position =

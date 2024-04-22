@@ -154,11 +154,8 @@ impl Keymui {
                     let total: Vec<f32> = args
                         .iter()
                         .map(|arg| {
-                            let chars: Vec<usize> = arg
-                                .chars()
-                                .map(|c| corpus.corpus_char(c))
-                                .cloned()
-                                .collect();
+                            let chars: Vec<usize> =
+                                arg.chars().map(|c| corpus.corpus_char(c)).collect();
                             let freqs: [u32; 2] = match &chars[..] {
                                 [a] => [corpus.chars[*a], 0],
                                 [a, b] => {

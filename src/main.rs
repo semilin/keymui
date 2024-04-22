@@ -339,8 +339,7 @@ impl Application for Keymui {
                             .width(Length::FillPortion(1)),
                         ],
                         if let Some(context) = &self.metric_context {
-                            let char_count =
-                                context.layout.total_char_count(&context.analyzer.corpus) as f32;
+                            let totals = context.layout.totals(&context.analyzer.corpus);
                             scrollable(column(
                                 context
                                     .metrics
@@ -368,13 +367,17 @@ impl Application for Keymui {
                                                             "{}/{:.0}",
                                                             self.config.stat_precision,
                                                             self.config.stat_precision as f32
-                                                                / (self.layout_stats[i]
-                                                                    / char_count)
+                                                                / (totals.percentage(
+                                                                    self.layout_stats[i],
+                                                                    m.ngram_type
+                                                                ) / 100.)
                                                         ),
                                                         DisplayStyle::Percentage => format!(
                                                             "{:.2}%",
-                                                            100.0 * self.layout_stats[i]
-                                                                / char_count
+                                                            totals.percentage(
+                                                                self.layout_stats[i],
+                                                                m.ngram_type
+                                                            )
                                                         ),
                                                     }
                                                 ))
@@ -640,19 +643,16 @@ impl Application for Keymui {
                         .layout
                         .matrix
                         .iter()
-                        .position(|c| c == ctx.analyzer.corpus.corpus_char(a));
+                        .position(|c| *c == ctx.analyzer.corpus.corpus_char(a));
                     let b = ctx
                         .layout
                         .matrix
                         .iter()
-                        .position(|c| c == ctx.analyzer.corpus.corpus_char(b));
+                        .position(|c| *c == ctx.analyzer.corpus.corpus_char(b));
                     if let (Some(a), Some(b)) = (a, b) {
                         let swap = Swap::new(a, b);
-                        let diffs = ctx.analyzer.swap_diff(
-                            vec![0.0; ctx.analyzer.data.metrics.len()],
-                            &ctx.layout,
-                            &swap,
-                        );
+                        let mut diffs = vec![0.0; ctx.analyzer.data.metrics.len()];
+                        ctx.analyzer.swap_diff(&mut diffs, &ctx.layout, &swap);
                         ctx.layout.swap(&swap);
                         self.layout_stats
                             .iter_mut()

@@ -99,7 +99,7 @@ impl Keymui {
             vec!['\\', '|'],
             vec!['`', '~'],
         ]);
-        let mut corpus = Corpus::with_char_list(&mut char_list);
+        let mut corpus = Corpus::with_char_list(char_list);
 
         corpus.add_file(&file)?;
 
@@ -202,9 +202,9 @@ impl Keymui {
         self.layout_stats.clear();
         self.layout_stats
             .resize(context.analyzer.data.metrics.len(), 0.0);
-        self.layout_stats = context
+        context
             .analyzer
-            .calc_stats(self.layout_stats.clone(), &context.layout);
+            .recalc_stats(&mut self.layout_stats, &context.layout);
 
         context.keyboard.process_combo_indexes();
 
@@ -242,7 +242,7 @@ impl Keymui {
     pub fn set_nstroke_list(&mut self) {
         if let Some(ctx) = &self.metric_context {
             self.nstrokes_list = Vec::with_capacity(ctx.analyzer.data.strokes.len() / 3);
-            let char_count = ctx.layout.total_char_count(&ctx.analyzer.corpus) as f32;
+            let totals = ctx.layout.totals(&ctx.analyzer.corpus);
             for (i, stroke) in ctx.analyzer.data.strokes.iter().enumerate() {
                 let amount = stroke
                     .amounts
@@ -254,7 +254,8 @@ impl Keymui {
                         &stroke.nstroke,
                         Some(ctx.analyzer.data.metrics[self.nstrokes_metric]),
                     );
-                    let freq_display = 100.0 * (count as f32) / char_count;
+                    let freq_display =
+                        totals.percentage(count as f32, ctx.analyzer.data.metrics[amt.metric]);
                     self.nstrokes_list.push((
                         i,
                         ctx.layout
