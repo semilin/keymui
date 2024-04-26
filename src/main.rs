@@ -25,6 +25,7 @@ use std::iter;
 use std::path::PathBuf;
 
 pub fn main() -> iced::Result {
+    color_eyre::install().unwrap();
     logic::initial_setup();
     Keymui::run(Settings {
         antialiasing: true,
@@ -36,23 +37,34 @@ pub fn main() -> iced::Result {
     })
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub enum DisplayStyle {
+    #[default]
     Ratio,
     Percentage,
 }
 
-impl Default for DisplayStyle {
-    fn default() -> Self {
-        DisplayStyle::Ratio
-    }
+#[derive(Serialize, Deserialize, Default, Copy, Clone)]
+pub enum NstrokeSortMethod {
+    #[default]
+    Frequency,
+    Value,
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(default)]
 pub struct Config {
     metrics_directory: Option<PathBuf>,
-    metric_display_styles: HashMap<String, DisplayStyle>,
+    metric_display_styles: HashMap<String, MetricDisplayConfig>,
     stat_precision: u32,
+    use_monospace: bool,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct MetricDisplayConfig {
+    display_style: DisplayStyle,
+    nstroke_sort_method: NstrokeSortMethod,
 }
 
 impl Default for Config {
@@ -60,12 +72,37 @@ impl Default for Config {
         Config {
             metrics_directory: None,
             metric_display_styles: HashMap::from([
-                ("roll".to_string(), DisplayStyle::Percentage),
-                ("sr-roll".to_string(), DisplayStyle::Percentage),
-                ("alt".to_string(), DisplayStyle::Percentage),
-                ("redir".to_string(), DisplayStyle::Percentage),
+                (
+                    "roll".to_string(),
+                    MetricDisplayConfig {
+                        display_style: DisplayStyle::Percentage,
+                        ..MetricDisplayConfig::default()
+                    },
+                ),
+                (
+                    "sr-roll".to_string(),
+                    MetricDisplayConfig {
+                        display_style: DisplayStyle::Percentage,
+                        ..MetricDisplayConfig::default()
+                    },
+                ),
+                (
+                    "alt".to_string(),
+                    MetricDisplayConfig {
+                        display_style: DisplayStyle::Percentage,
+                        ..MetricDisplayConfig::default()
+                    },
+                ),
+                (
+                    "redir".to_string(),
+                    MetricDisplayConfig {
+                        display_style: DisplayStyle::Percentage,
+                        ..MetricDisplayConfig::default()
+                    },
+                ),
             ]),
             stat_precision: 1,
+            use_monospace: true,
         }
     }
 }
@@ -91,10 +128,19 @@ pub struct Keymui {
     corpora: BTreeMap<String, PathBuf>,
 
     nstrokes_metric: usize,
-    nstrokes_list: Vec<(usize, String)>,
+    nstrokes_list: Vec<(usize, String, f32, f32)>,
     keyboard_size: usize,
 
     config: Config,
+}
+
+impl Keymui {
+    pub fn monospaced_font(&self) -> Font {
+        match self.config.use_monospace {
+            true => Font::MONOSPACE,
+            false => Font::DEFAULT,
+        }
+    }
 }
 
 impl Application for Keymui {
@@ -114,10 +160,7 @@ impl Application for Keymui {
             *panes
                 .panes
                 .iter()
-                .find(|p| match p.1.kind {
-                    PaneKind::Metrics => true,
-                    _ => false,
-                })
+                .find(|p| matches!(p.1.kind, PaneKind::Metrics))
                 .unwrap()
                 .0,
             Pane::new(PaneKind::Nstrokes),
@@ -168,8 +211,12 @@ impl Application for Keymui {
         keymui.current_layout = keymui.layouts.keys().next().cloned();
         keymui.current_metrics = keymui.metric_lists.keys().next().cloned();
         keymui.current_corpus = keymui.corpora.keys().next().cloned();
-        keymui.load_data();
-        let _ = keymui.load_config();
+        if let Err(e) = keymui.load_data() {
+            println!("{:?}", e);
+        }
+        if let Err(e) = keymui.load_config() {
+            println!("{:?}", e);
+        }
         keymui.input_options = keymui
             .commands
             .iter()
@@ -240,7 +287,7 @@ impl Application for Keymui {
                                                         })
                                                         .collect::<String>(),
                                                 )
-                                                .font(Font::MONOSPACE)
+                                                .font(self.monospaced_font())
                                                 .width(Length::Fill),
                                                 text({
                                                     let mut c =
@@ -253,7 +300,7 @@ impl Application for Keymui {
                                                     }
                                                     c
                                                 })
-                                                .font(Font::MONOSPACE)
+                                                .font(self.monospaced_font())
                                                 .width(Length::Fill)
                                             ])
                                         },
@@ -289,46 +336,59 @@ impl Application for Keymui {
                             .width(Length::FillPortion(1)),
                         ],
                         if let Some(context) = &self.metric_context {
-                            let char_count =
-                                context.layout.total_char_count(&context.analyzer.corpus) as f32;
-                            scrollable(column(context.metrics.iter().enumerate().map(|(i, m)| {
-                                Element::from(row![
-                                    container(
-                                        button(text(m.name.clone()))
-                                            .on_press(Message::SetNstrokesMetric(i))
-                                            .style(theme::Button::Text)
-                                            .padding(0)
-                                    )
-                                    .width(Length::FillPortion(3)),
-                                    container(
-                                        button(text(
-                                            match self
-                                                .config
-                                                .metric_display_styles
-                                                .get(&context.metrics[i].short)
-                                                .unwrap_or(&DisplayStyle::Ratio)
-                                            {
-                                                DisplayStyle::Ratio => format!(
-                                                    "{}/{:.0}",
-                                                    self.config.stat_precision,
-                                                    self.config.stat_precision as f32
-                                                        / (self.layout_stats[i] / char_count)
-                                                ),
-                                                DisplayStyle::Percentage => format!(
-                                                    "{:.2}%",
-                                                    100.0 * self.layout_stats[i] / char_count
-                                                ),
-                                            }
-                                        ))
-                                        .on_press(Message::ToggleDisplayStyle(
-                                            context.metrics[i].short.clone()
-                                        ))
-                                        .style(theme::Button::Text)
-                                        .padding(0)
-                                    )
-                                    .width(Length::FillPortion(1)),
-                                ])
-                            })))
+                            let totals = context.layout.totals(&context.analyzer.corpus);
+                            scrollable(column(
+                                context
+                                    .metrics
+                                    .iter()
+                                    .enumerate()
+                                    .map(|(i, m)| {
+                                        Element::from(row![
+                                            container(
+                                                button(text(m.name.clone()))
+                                                    .on_press(Message::SetNstrokesMetric(i))
+                                                    .style(theme::Button::Text)
+                                                    .padding(0)
+                                            )
+                                            .width(Length::FillPortion(3)),
+                                            container(
+                                                button(text(
+                                                    match self
+                                                        .config
+                                                        .metric_display_styles
+                                                        .get(&context.metrics[i].short)
+                                                        .unwrap_or(&MetricDisplayConfig::default())
+                                                        .display_style
+                                                    {
+                                                        DisplayStyle::Ratio => format!(
+                                                            "{}/{:.0}",
+                                                            self.config.stat_precision,
+                                                            self.config.stat_precision as f32
+                                                                / (totals.percentage(
+                                                                    self.layout_stats[i],
+                                                                    m.ngram_type
+                                                                ) / 100.)
+                                                        ),
+                                                        DisplayStyle::Percentage => format!(
+                                                            "{:.2}%",
+                                                            totals.percentage(
+                                                                self.layout_stats[i],
+                                                                m.ngram_type
+                                                            )
+                                                        ),
+                                                    }
+                                                ))
+                                                .on_press(Message::ToggleDisplayStyle(
+                                                    context.metrics[i].short.clone()
+                                                ))
+                                                .style(theme::Button::Text)
+                                                .padding(0)
+                                            )
+                                            .width(Length::FillPortion(1)),
+                                        ])
+                                    })
+                                    .collect(),
+                            ))
                         } else {
                             scrollable(text("no metrics available!"))
                         }
@@ -337,42 +397,38 @@ impl Application for Keymui {
                     .into(),
                     PaneKind::Nstrokes => {
                         if let Some(ctx) = &self.metric_context {
-                            let char_count =
-                                ctx.layout.total_char_count(&ctx.analyzer.corpus) as f32;
                             column![
-                                text(if self.nstrokes_list.len() == 0 {
-                                    "".to_string()
-                                } else {
-                                    ctx.metrics[self.nstrokes_metric].name.clone()
-                                })
-                                .size(18),
-                                scrollable(column(self.nstrokes_list.iter().enumerate().map(
-                                    |(i, n)| {
-                                        Element::from(
-                                            container(
-                                                row![
-                                                    container(
-                                                        text(self.nstrokes_list[i].1.clone())
-                                                            .font(Font::MONOSPACE)
-                                                    )
-                                                    .width(Length::FillPortion(1)),
-                                                    container(text(format!(
-                                                        "{:.2}%",
-                                                        100.0
-                                                            * ctx.layout.frequency(
-                                                                &ctx.analyzer.corpus,
-                                                                &ctx.analyzer.data.strokes[n.0]
-                                                                    .nstroke,
-                                                                Some(
-                                                                    ctx.analyzer.data.metrics
-                                                                        [self.nstrokes_metric]
-                                                                ),
-                                                            )
-                                                                as f32
-                                                            / char_count
-                                                    )))
-                                                    .width(Length::FillPortion(1))
-                                                ]
+                                button(
+                                    text(if self.nstrokes_list.is_empty() {
+                                        "".to_string()
+                                    } else {
+                                        ctx.metrics[self.nstrokes_metric].name.clone()
+                                    })
+                                    .size(18),
+                                )
+                                .on_press(Message::ToggleSortMethod(
+                                    ctx.metrics[self.nstrokes_metric].short.clone()
+                                ))
+                                .style(theme::Button::Text),
+                                scrollable(column(
+                                    self.nstrokes_list
+                                        .iter()
+                                        .take(100)
+                                        .map(|n| {
+                                            Element::from(
+                                                container(
+                                                    row![
+                                                        container(
+                                                            text(&n.1).font(self.monospaced_font())
+                                                        )
+                                                        .width(Length::FillPortion(1)),
+                                                        container(text(format!("{:.2}%", &n.2)))
+                                                            .width(Length::FillPortion(1)),
+                                                        container(text(format!("{:.3}", &n.3)))
+                                                            .width(Length::FillPortion(1)),
+                                                    ]
+                                                    .width(Length::Fill),
+                                                )
                                                 .width(Length::Fill),
                                             )
                                             .width(Length::Fill),
@@ -488,7 +544,9 @@ impl Application for Keymui {
                     Err(e) => self.notification = (e.to_string(), None),
                 }
                 let _ = self.set_metric_list();
-                self.load_data();
+                if let Err(e) = self.load_data() {
+                    println!("{:?}", e);
+                }
             }
             Message::ImportNewCorpus => {
                 let file = FileDialog::new()
@@ -523,8 +581,7 @@ impl Application for Keymui {
                         priority[0]
                     } else {
                         let common_idx = commonest_completion(
-                            &self
-                                .input_completions
+                            self.input_completions
                                 .iter()
                                 .map(|x| self.input_options[*x].1.as_ref())
                                 .collect(),
@@ -559,15 +616,15 @@ impl Application for Keymui {
             }
             Message::LayoutSelected(s) => {
                 self.current_layout = Some(s);
-                self.load_data();
+                let _ = self.load_data();
             }
             Message::ContextSelected(s) => {
                 self.current_metrics = Some(s);
-                self.load_data();
+                let _ = self.load_data();
             }
             Message::CorpusSelected(s) => {
                 self.current_corpus = Some(s);
-                self.load_data();
+                let _ = self.load_data();
             }
             Message::DisplayStyleSet(style) => {
                 if let Some(display) = &mut self.layout_display {
@@ -587,19 +644,16 @@ impl Application for Keymui {
                         .layout
                         .matrix
                         .iter()
-                        .position(|c| c == ctx.analyzer.corpus.corpus_char(a));
+                        .position(|c| *c == ctx.analyzer.corpus.corpus_char(a));
                     let b = ctx
                         .layout
                         .matrix
                         .iter()
-                        .position(|c| c == ctx.analyzer.corpus.corpus_char(b));
+                        .position(|c| *c == ctx.analyzer.corpus.corpus_char(b));
                     if let (Some(a), Some(b)) = (a, b) {
                         let swap = Swap::new(a, b);
-                        let diffs = ctx.analyzer.swap_diff(
-                            vec![0.0; ctx.analyzer.data.metrics.len()],
-                            &ctx.layout,
-                            &swap,
-                        );
+                        let mut diffs = vec![0.0; ctx.analyzer.data.metrics.len()];
+                        ctx.analyzer.swap_diff(&mut diffs, &ctx.layout, &swap);
                         ctx.layout.swap(&swap);
                         self.layout_stats
                             .iter_mut()
@@ -623,18 +677,41 @@ impl Application for Keymui {
                 self.config.stat_precision = n;
             }
             Message::ToggleDisplayStyle(s) => {
-                let style = self.config.metric_display_styles.get_mut(&s);
-                if let Some(style) = style {
-                    *style = match style {
+                let conf = self.config.metric_display_styles.get_mut(&s);
+                if let Some(conf) = conf {
+                    conf.display_style = match conf.display_style {
                         DisplayStyle::Ratio => DisplayStyle::Percentage,
                         DisplayStyle::Percentage => DisplayStyle::Ratio,
                     }
                 } else {
-                    self.config
-                        .metric_display_styles
-                        .insert(s, DisplayStyle::Percentage);
+                    self.config.metric_display_styles.insert(
+                        s,
+                        MetricDisplayConfig {
+                            display_style: DisplayStyle::Percentage,
+                            ..MetricDisplayConfig::default()
+                        },
+                    );
                 }
             }
+            Message::ToggleSortMethod(s) => {
+                let conf = self.config.metric_display_styles.get_mut(&s);
+                if let Some(conf) = conf {
+                    conf.nstroke_sort_method = match conf.nstroke_sort_method {
+                        NstrokeSortMethod::Frequency => NstrokeSortMethod::Value,
+                        NstrokeSortMethod::Value => NstrokeSortMethod::Frequency,
+                    }
+                } else {
+                    self.config.metric_display_styles.insert(
+                        s,
+                        MetricDisplayConfig {
+                            nstroke_sort_method: NstrokeSortMethod::Value,
+                            ..MetricDisplayConfig::default()
+                        },
+                    );
+                };
+                self.sort_nstroke_list();
+            }
+            #[allow(clippy::single_match)]
             Message::RuntimeEvent(e) => match e {
                 Event::Window(id, window::Event::CloseRequested) => {
                     let _ = self.save_config();
@@ -651,7 +728,7 @@ impl Application for Keymui {
                         .metric_context
                         .as_ref()
                         .expect("display exists, therefore context should");
-                    display.update_keys(&ctx, self.nstrokes_metric);
+                    display.update_keys(ctx, self.nstrokes_metric);
                     display.redraw();
                 }
             }
@@ -678,6 +755,7 @@ pub enum Message {
     SwapKeys(char, char),
     SetPrecision(u32),
     ToggleDisplayStyle(String),
+    ToggleSortMethod(String),
     SetNstrokesMetric(usize),
     RuntimeEvent(Event),
 }

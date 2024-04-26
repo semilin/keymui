@@ -1,13 +1,12 @@
-use crate::download;
 use crate::layout_display::{ColorStyle, LayoutDisplay};
 use crate::Keymui;
-use anyhow::{anyhow, Result};
+use crate::{download, NstrokeSortMethod};
+use color_eyre::eyre::{anyhow, Context, ContextCompat, Result};
 use directories::BaseDirs;
 use kc::Corpus;
 use km::{self, MetricContext};
 use std::ffi::OsStr;
-use std::fs::{self, File};
-use std::io::Write;
+use std::fs;
 use std::path::PathBuf;
 
 pub fn initial_setup() {
@@ -16,9 +15,9 @@ pub fn initial_setup() {
     if data_dir.exists() {
         return;
     }
-    fs::create_dir_all(&data_dir.join("layouts")).unwrap();
-    fs::create_dir_all(&data_dir.join("corpora")).unwrap();
-    fs::create_dir_all(&data_dir.join("metrics")).unwrap();
+    fs::create_dir_all(data_dir.join("layouts")).unwrap();
+    fs::create_dir_all(data_dir.join("corpora")).unwrap();
+    fs::create_dir_all(data_dir.join("metrics")).unwrap();
     let _ = download::download_files(&data_dir);
 }
 
@@ -35,25 +34,32 @@ impl Keymui {
         let cdir = self.config_dir();
         fs::create_dir_all(&cdir)?;
         let path = cdir.join("config.json");
-        self.config = serde_json::from_str(&fs::read_to_string(path)?)?;
+        self.config = serde_json::from_str(&fs::read_to_string(&path).context(format!(
+            "couldn't read config file from path {}",
+            &path.display()
+        ))?)
+        .context("couldn't parse config file")?;
         Ok(())
     }
 
     pub fn save_config(&self) -> Result<()> {
         let cdir = self.config_dir();
         let path = cdir.join("config.json");
-        let s = serde_json::to_string(&self.config)?;
-        fs::write(path, s)?;
+        let s = serde_json::to_string_pretty(&self.config)?;
+        fs::write(&path, s)
+            .context(format!("couldn't write config file to {}", &path.display()))?;
         Ok(())
     }
 
     pub fn load_layouts(&mut self) -> Result<()> {
         let ldir = self.data_dir().join("layouts");
         fs::create_dir_all(&ldir)?;
-        for entry in fs::read_dir(ldir)? {
+        for entry in fs::read_dir(ldir).context("couldn't read layouts directory")? {
             let path = entry?.path();
-            let s = fs::read_to_string(path)?;
-            let layout: km::LayoutData = serde_json::from_str(&s)?;
+            let s = fs::read_to_string(&path)
+                .with_context(|| format!("couldn't read file {}", &path.display()))?;
+            let layout: km::LayoutData = serde_json::from_str(&s)
+                .with_context(|| format!("couldn't parse layout file {}", &path.display()))?;
             self.layouts
                 .insert(layout.name.clone().to_lowercase().replace(' ', "-"), layout);
         }
@@ -93,14 +99,14 @@ impl Keymui {
             vec!['\\', '|'],
             vec!['`', '~'],
         ]);
-        let mut corpus = Corpus::with_char_list(&mut char_list);
+        let mut corpus = Corpus::with_char_list(char_list);
 
         corpus.add_file(&file)?;
 
-        let text = serde_json::to_string(&corpus)?;
+        let bin = rmp_serde::to_vec(&corpus)?;
         let mut new_path = cdir.join(file.file_stem().ok_or(anyhow!("couldn't get path stem"))?);
-        new_path.set_extension("json");
-        write!(File::create(new_path)?, "{}", text)?;
+        new_path.set_extension("corpus");
+        fs::write(new_path, bin)?;
         Ok(())
     }
 
@@ -111,13 +117,13 @@ impl Keymui {
             .metrics_directory
             .as_ref()
             .ok_or(anyhow!("no metrics directory set"))?;
-        for entry in fs::read_dir(path)? {
+        for entry in fs::read_dir(path).context("couldn't read metrics directory")? {
             let entry = entry?;
             let path = entry.path();
 
             match path.extension() {
                 Some(ext) => {
-                    if ext != OsStr::new("json") {
+                    if ext != OsStr::new("metrics") {
                         continue;
                     }
                     let name = &path
@@ -131,8 +137,12 @@ impl Keymui {
                     let mdir = self.base_dirs.data_dir().join("keymeow").join("metrics");
                     let newpath =
                         mdir.join(path.file_name().ok_or(anyhow!("couldn't get filename"))?);
-                    let s = fs::read_to_string(&path)?;
-                    fs::write(newpath, s)?;
+                    let b = fs::read(&path).with_context(|| {
+                        format!("couldn't read metrics file {}", &path.display())
+                    })?;
+                    fs::write(&newpath, b).with_context(|| {
+                        format!("couldn't write metrics to {}", &newpath.display())
+                    })?;
                 }
                 None => continue,
             };
@@ -149,7 +159,7 @@ impl Keymui {
         let cdir = self.data_dir().join("corpora");
         fs::create_dir_all(&cdir)?;
 
-        for entry in fs::read_dir(cdir)? {
+        for entry in fs::read_dir(cdir).context("couldn't read corpus directory")? {
             let path = entry?.path();
             let name = path
                 .file_stem()
@@ -161,28 +171,40 @@ impl Keymui {
         Ok(())
     }
 
-    pub fn load_data(&mut self) -> Option<()> {
-        let path = self.metric_lists.get(&self.current_metrics.clone()?)?;
-        let s = fs::read_to_string(path).ok()?;
-        let metrics: km::MetricData = serde_json::from_str(&s).ok()?;
+    pub fn load_data(&mut self) -> Result<()> {
+        let path = self
+            .metric_lists
+            .get(
+                &self
+                    .current_metrics
+                    .clone()
+                    .context("no metrics selected")?,
+            )
+            .context("metric data doesn't exist")?;
+        let b = fs::read(path).context("couldn't read metrics file")?;
+        let metrics: km::MetricData =
+            rmp_serde::from_slice(&b).context("couldn't deserialize metrics")?;
 
-        let corpus = self.current_corpus.clone()?;
-        let path = self.corpora.get(&corpus)?;
-        let s = fs::read_to_string(path).ok()?;
-        let corpus: Corpus = serde_json::from_str(&s).ok()?;
+        let corpus = self.current_corpus.clone().context("no corpus selected")?;
+        let path = self.corpora.get(&corpus).context("corpus doesn't exist")?;
+        let b = fs::read(path).context("couldn't read corpus file")?;
+        let corpus: Corpus = rmp_serde::from_slice(&b).context("couldn't deserialize corpus")?;
 
         let mut context = MetricContext::new(
-            self.layouts.get(&self.current_layout.clone()?)?,
+            self.layouts
+                .get(&self.current_layout.clone().context("no layout selected")?)
+                .context("layout doesn't exist")?,
             metrics,
             corpus,
-        )?;
+        )
+        .context("couldn't create metric context from selection")?;
 
         self.layout_stats.clear();
         self.layout_stats
             .resize(context.analyzer.data.metrics.len(), 0.0);
-        self.layout_stats = context
+        context
             .analyzer
-            .calc_stats(self.layout_stats.clone(), &context.layout);
+            .recalc_stats(&mut self.layout_stats, &context.layout);
 
         context.keyboard.process_combo_indexes();
 
@@ -198,7 +220,7 @@ impl Keymui {
         self.set_nstroke_list();
         self.sort_nstroke_list();
 
-        Some(())
+        Ok(())
     }
 
     pub fn set_metric_list(&mut self) -> Result<()> {
@@ -220,20 +242,37 @@ impl Keymui {
     pub fn set_nstroke_list(&mut self) {
         if let Some(ctx) = &self.metric_context {
             self.nstrokes_list = Vec::with_capacity(ctx.analyzer.data.strokes.len() / 3);
+            let totals = ctx.layout.totals(&ctx.analyzer.corpus);
             for (i, stroke) in ctx.analyzer.data.strokes.iter().enumerate() {
-                if stroke
+                let amount = stroke
                     .amounts
                     .iter()
-                    .any(|m| m.metric == self.nstrokes_metric)
-                {
-                    self.nstrokes_list.push((
-                        i,
-                        ctx.layout
-                            .nstroke_chars(&ctx.analyzer.data.strokes[i].nstroke)
-                            .iter()
-                            .map(|c| ctx.analyzer.corpus.uncorpus_unigram(*c))
-                            .collect::<String>(),
-                    ));
+                    .find(|m| m.metric == self.nstrokes_metric);
+                if let Some(amt) = amount {
+                    let count = ctx.layout.frequency(
+                        &ctx.analyzer.corpus,
+                        &stroke.nstroke,
+                        Some(ctx.analyzer.data.metrics[self.nstrokes_metric]),
+                    );
+                    let freq_display =
+                        totals.percentage(count as f32, ctx.analyzer.data.metrics[amt.metric]);
+                    let nstroke = ctx.layout.nstroke_chars(&stroke.nstroke);
+
+                    if !nstroke.iter().any(|c| *c == 0) {
+                        self.nstrokes_list.push((
+                            i,
+                            nstroke
+                                .iter()
+                                .map(|c| ctx.analyzer.corpus.uncorpus_unigram(*c))
+                                .map(|c| match c {
+                                    ' ' => '␣',
+                                    _ => c,
+                                })
+                                .collect::<String>(),
+                            freq_display,
+                            amt.amount,
+                        ))
+                    };
                 }
             }
         }
@@ -241,13 +280,15 @@ impl Keymui {
 
     pub fn sort_nstroke_list(&mut self) {
         if let Some(ctx) = &self.metric_context {
-            let an = &ctx.analyzer;
-            self.nstrokes_list.sort_by_key(|i| {
-                ctx.layout.frequency(
-                    &an.corpus,
-                    &an.data.strokes[i.0].nstroke,
-                    Some(an.data.metrics[self.nstrokes_metric]),
-                )
+            let method = self
+                .config
+                .metric_display_styles
+                .get(&ctx.metrics[self.nstrokes_metric].short)
+                .map(|x| x.nstroke_sort_method)
+                .unwrap_or_default();
+            self.nstrokes_list.sort_by(|a, b| match method {
+                NstrokeSortMethod::Frequency => a.2.partial_cmp(&b.2).unwrap(),
+                NstrokeSortMethod::Value => a.3.partial_cmp(&b.3).unwrap(),
             });
             self.nstrokes_list.reverse();
         }

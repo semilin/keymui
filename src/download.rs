@@ -47,7 +47,7 @@ pub fn download_repo(
     for filedata in data {
         println!("downloading {}", filedata.name);
         if let Ok(contents) = client.get(filedata.download_url).send() {
-            let result = fs::write(directory.join(filedata.name), contents.text()?);
+            let result = fs::write(directory.join(filedata.name), contents.bytes()?);
             println!("{:?}", result);
         };
     }

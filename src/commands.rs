@@ -32,10 +32,7 @@ impl UserCommand {
         }
     }
     pub fn is_priority(self) -> bool {
-        match self {
-            UserCommand::Swap => true,
-            _ => false,
-        }
+        matches!(self, UserCommand::Swap)
     }
 }
 
@@ -79,8 +76,8 @@ pub fn linear_matches(src: &str, target: &str) -> bool {
 //         .collect()
 // }
 
-pub fn commonest_completion(matches: &Vec<&str>) -> usize {
-    if matches.len() == 0 {
+pub fn commonest_completion(matches: Vec<&str>) -> usize {
+    if matches.is_empty() {
         return 0;
     } else if matches.len() == 1 {
         return matches[0].len();
@@ -93,27 +90,27 @@ pub fn commonest_completion(matches: &Vec<&str>) -> usize {
         }
     }
 
-    return 0;
+    0
 }
 
 impl Keymui {
     pub fn parse_command(&mut self) {
         let input = self.command_input.clone();
         let split: Vec<&str> = input.split_whitespace().collect();
-        if split.len() == 0 {
+        if split.is_empty() {
             return;
         }
         let command = self
             .commands
             .iter()
-            .map(|x| *x)
-            .find(|c| c.to_string() == split[0]);
+            .find(|c| c.to_string() == split[0])
+            .copied();
         if let Some(cmd) = command {
             let args: Vec<&str> = split
                 .iter()
                 .skip(1)
                 .take(cmd.args().len())
-                .map(|x| *x)
+                .copied()
                 .collect();
 
             self.run_command(&cmd, &args);
@@ -157,11 +154,8 @@ impl Keymui {
                     let total: Vec<f32> = args
                         .iter()
                         .map(|arg| {
-                            let chars: Vec<usize> = arg
-                                .chars()
-                                .map(|c| corpus.corpus_char(c))
-                                .cloned()
-                                .collect();
+                            let chars: Vec<usize> =
+                                arg.chars().map(|c| corpus.corpus_char(c)).collect();
                             let freqs: [u32; 2] = match &chars[..] {
                                 [a] => [corpus.chars[*a], 0],
                                 [a, b] => {

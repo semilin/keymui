@@ -93,15 +93,17 @@ impl LayoutDisplay {
                             .strokes
                             .iter()
                             .filter(|data| data.nstroke.to_vec().contains(&p))
-                            .filter_map(|s| match s.amounts.iter().find(|am| am.metric == metric) {
-                                Some(am) => Some((&s.nstroke, am)),
-                                None => None,
+                            .filter_map(|s| {
+                                s.amounts
+                                    .iter()
+                                    .find(|am| am.metric == metric)
+                                    .map(|am| (&s.nstroke, am))
                             })
                             .map(|(ns, am)| {
                                 am.amount
                                     * ctx.layout.frequency(
                                         &ctx.analyzer.corpus,
-                                        &ns,
+                                        ns,
                                         Some(ctx.metrics[metric].ngram_type),
                                     ) as f32
                             })
@@ -132,10 +134,7 @@ impl LayoutDisplay {
                 (
                     kc.clone(),
                     Some(KeyData {
-                        letter: match corpus.uncorpus_unigram(*c) {
-                            '\0' => ' ',
-                            _ => corpus.uncorpus_unigram(*c),
-                        },
+                        letter: corpus.uncorpus_unigram(*c),
                         frequency: match style {
                             ColorStyle::Frequency => freqs[i],
                             ColorStyle::Metric => freqs[i],
@@ -239,7 +238,11 @@ impl canvas::Program<Message> for LayoutDisplay {
                     color,
                 );
                 if let Some(data) = data {
-                    let mut text = Text::from(data.letter.to_string());
+                    let mut text = Text::from(match data.letter {
+                        ' ' => "␣".to_string(),
+                        '\0' => "".to_string(),
+                        _ => data.letter.to_string(),
+                    });
                     let bx = offset + key.x * scale;
                     let by = (key.y - self.lowest_y) * scale;
                     text.position =
