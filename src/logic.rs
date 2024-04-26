@@ -256,16 +256,23 @@ impl Keymui {
                     );
                     let freq_display =
                         totals.percentage(count as f32, ctx.analyzer.data.metrics[amt.metric]);
-                    self.nstrokes_list.push((
-                        i,
-                        ctx.layout
-                            .nstroke_chars(&stroke.nstroke)
-                            .iter()
-                            .map(|c| ctx.analyzer.corpus.uncorpus_unigram(*c))
-                            .collect::<String>(),
-                        freq_display,
-                        amt.amount,
-                    ));
+                    let nstroke = ctx.layout.nstroke_chars(&stroke.nstroke);
+
+                    if !nstroke.iter().any(|c| *c == 0) {
+                        self.nstrokes_list.push((
+                            i,
+                            nstroke
+                                .iter()
+                                .map(|c| ctx.analyzer.corpus.uncorpus_unigram(*c))
+                                .map(|c| match c {
+                                    ' ' => '␣',
+                                    _ => c,
+                                })
+                                .collect::<String>(),
+                            freq_display,
+                            amt.amount,
+                        ))
+                    };
                 }
             }
         }

@@ -239,10 +239,10 @@ impl canvas::Program<Message> for LayoutDisplay {
                 );
                 if let Some(data) = data {
                     let mut text = Text::from(match data.letter {
-			' ' => "␣".to_string(),
-			'\0' => "".to_string(),
-			_ => data.letter.to_string()
-		    });
+                        ' ' => "␣".to_string(),
+                        '\0' => "".to_string(),
+                        _ => data.letter.to_string(),
+                    });
                     let bx = offset + key.x * scale;
                     let by = (key.y - self.lowest_y) * scale;
                     text.position =
