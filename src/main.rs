@@ -4,7 +4,7 @@ mod layout_display;
 mod logic;
 use commands::{commonest_completion, UserCommand};
 use directories::BaseDirs;
-use iced::subscription::events;
+use iced::event::{self, Event};
 use iced::theme;
 use iced::widget::pane_grid::{self, Axis, PaneGrid};
 use iced::widget::{
@@ -12,8 +12,7 @@ use iced::widget::{
 };
 use iced::window;
 use iced::{
-    alignment, executor, Application, Command, Element, Event, Font, Length, Settings,
-    Subscription, Theme,
+    alignment, executor, Application, Command, Element, Font, Length, Settings, Subscription, Theme,
 };
 use iced_aw::{modal, Card};
 use kc::Swap;
@@ -30,7 +29,10 @@ pub fn main() -> iced::Result {
     logic::initial_setup();
     Keymui::run(Settings {
         antialiasing: true,
-        exit_on_close_request: false,
+        window: iced::window::Settings {
+            exit_on_close_request: false,
+            ..Default::default()
+        },
         ..Settings::default()
     })
 }
@@ -150,14 +152,13 @@ impl Application for Keymui {
     fn new(_flags: ()) -> (Self, Command<Self::Message>) {
         let (mut panes, _) = pane_grid::State::new(Pane::new(PaneKind::Layout));
         for pane in panes.panes.clone() {
-            panes.split(Axis::Vertical, &pane.0, Pane::new(PaneKind::Metrics));
+            panes.split(Axis::Vertical, pane.0, Pane::new(PaneKind::Metrics));
         }
 
         panes.split(
             Axis::Horizontal,
-            panes
+            *panes
                 .panes
-                .clone()
                 .iter()
                 .find(|p| matches!(p.1.kind, PaneKind::Metrics))
                 .unwrap()
@@ -270,12 +271,8 @@ impl Application for Keymui {
                             text("Combos").size(18),
                             if let Some(context) = &self.metric_context {
                                 container(scrollable(column(
-                                    context
-                                        .keyboard
-                                        .combo_indexes
-                                        .iter()
-                                        .enumerate()
-                                        .map(|(idx, combo)| {
+                                    context.keyboard.combo_indexes.iter().enumerate().map(
+                                        |(idx, combo)| {
                                             Element::from(row![
                                                 text(
                                                     combo
@@ -306,8 +303,8 @@ impl Application for Keymui {
                                                 .font(self.monospaced_font())
                                                 .width(Length::Fill)
                                             ])
-                                        })
-                                        .collect(),
+                                        },
+                                    ),
                                 )))
                                 .height(Length::Fill)
                             } else {
@@ -390,7 +387,7 @@ impl Application for Keymui {
                                             .width(Length::FillPortion(1)),
                                         ])
                                     })
-                                    .collect(),
+                                    .collect::<Vec<_>>(),
                             ))
                         } else {
                             scrollable(text("no metrics available!"))
@@ -413,30 +410,22 @@ impl Application for Keymui {
                                     ctx.metrics[self.nstrokes_metric].short.clone()
                                 ))
                                 .style(theme::Button::Text),
-                                scrollable(column(
-                                    self.nstrokes_list
-                                        .iter()
-                                        .take(100)
-                                        .map(|n| {
-                                            Element::from(
-                                                container(
-                                                    row![
-                                                        container(
-                                                            text(&n.1).font(self.monospaced_font())
-                                                        )
-                                                        .width(Length::FillPortion(1)),
-                                                        container(text(format!("{:.2}%", &n.2)))
-                                                            .width(Length::FillPortion(1)),
-                                                        container(text(format!("{:.3}", &n.3)))
-                                                            .width(Length::FillPortion(1)),
-                                                    ]
-                                                    .width(Length::Fill),
-                                                )
-                                                .width(Length::Fill),
-                                            )
-                                        })
-                                        .collect(),
-                                ))
+                                scrollable(column(self.nstrokes_list.iter().take(100).map(|n| {
+                                    Element::from(
+                                        container(
+                                            row![
+                                                container(text(&n.1).font(self.monospaced_font()))
+                                                    .width(Length::FillPortion(1)),
+                                                container(text(format!("{:.2}%", &n.2)))
+                                                    .width(Length::FillPortion(1)),
+                                                container(text(format!("{:.3}", &n.3)))
+                                                    .width(Length::FillPortion(1)),
+                                            ]
+                                            .width(Length::Fill),
+                                        )
+                                        .width(Length::Fill),
+                                    )
+                                })))
                             ]
                             .spacing(5)
                             .into()
@@ -454,8 +443,7 @@ impl Application for Keymui {
             self.input_completions
                 .iter()
                 .take(5)
-                .map(|i| Element::from(text(&self.commands[*i].to_string())))
-                .collect(),
+                .map(|i| Element::from(text(&self.commands[*i].to_string()))),
         ))
         .height(Length::FillPortion(2))
         .align_y(alignment::Vertical::Bottom);
@@ -500,16 +488,20 @@ impl Application for Keymui {
             .center_x()
             .into();
 
-        let notif_modal = container(Card::new(
-            "Notification Details",
-            if let Some(s) = &self.notification.1 {
-                s
-            } else {
-                ""
-            },
-        ));
+        let notif_modal = if self.show_notif_modal {
+            Some(container(Card::new(
+                "Notification Details",
+                if let Some(s) = &self.notification.1 {
+                    s
+                } else {
+                    ""
+                },
+            )))
+        } else {
+            None
+        };
 
-        modal(self.show_notif_modal, view, notif_modal)
+        modal(view, notif_modal)
             .backdrop(Message::CloseNotifModal)
             .on_esc(Message::CloseNotifModal)
             .into()
@@ -520,7 +512,7 @@ impl Application for Keymui {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        events().map(Message::RuntimeEvent)
+        event::listen().map(|x| Message::RuntimeEvent(x))
     }
 
     fn update(&mut self, message: Message) -> Command<Message> {
@@ -635,7 +627,7 @@ impl Application for Keymui {
                 }
             }
             Message::Resized(pane_grid::ResizeEvent { split, ratio }) => {
-                self.panes.resize(&split, ratio);
+                self.panes.resize(split, ratio);
             }
             Message::SwapKeys(a, b) => {
                 if let Some(ctx) = &mut self.metric_context {
@@ -712,9 +704,9 @@ impl Application for Keymui {
             }
             #[allow(clippy::single_match)]
             Message::RuntimeEvent(e) => match e {
-                Event::Window(window::Event::CloseRequested) => {
+                Event::Window(id, window::Event::CloseRequested) => {
                     let _ = self.save_config();
-                    return window::close();
+                    return window::close(id);
                 }
                 _ => (),
             },

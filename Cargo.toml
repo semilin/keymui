@@ -6,8 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-iced = {version = "0.10.0", features = ["lazy", "canvas"]}
-iced_aw = {version = "0.6.0", default-features = false, features = ["card", "modal"]}
+iced = {version = "0.12.1", features = ["lazy", "canvas"]}
+iced_aw = {version = "0.8.0", default-features = false, features = ["card", "modal"]}
 km = {package = "keymeow", git = "https://github.com/semilin/keymeow"}
 kc = {package = "keycat", git = "https://github.com/semilin/keycat"}
 rfd = {version = "0.11.4"}
