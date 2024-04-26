@@ -387,7 +387,7 @@ impl Application for Keymui {
                                             .width(Length::FillPortion(1)),
                                         ])
                                     })
-                                    .collect(),
+                                    .collect::<Vec<_>>(),
                             ))
                         } else {
                             scrollable(text("no metrics available!"))
@@ -410,31 +410,22 @@ impl Application for Keymui {
                                     ctx.metrics[self.nstrokes_metric].short.clone()
                                 ))
                                 .style(theme::Button::Text),
-                                scrollable(column(
-                                    self.nstrokes_list
-                                        .iter()
-                                        .take(100)
-                                        .map(|n| {
-                                            Element::from(
-                                                container(
-                                                    row![
-                                                        container(
-                                                            text(&n.1).font(self.monospaced_font())
-                                                        )
-                                                        .width(Length::FillPortion(1)),
-                                                        container(text(format!("{:.2}%", &n.2)))
-                                                            .width(Length::FillPortion(1)),
-                                                        container(text(format!("{:.3}", &n.3)))
-                                                            .width(Length::FillPortion(1)),
-                                                    ]
-                                                    .width(Length::Fill),
-                                                )
-                                                .width(Length::Fill),
-                                            )
+                                scrollable(column(self.nstrokes_list.iter().take(100).map(|n| {
+                                    Element::from(
+                                        container(
+                                            row![
+                                                container(text(&n.1).font(self.monospaced_font()))
+                                                    .width(Length::FillPortion(1)),
+                                                container(text(format!("{:.2}%", &n.2)))
+                                                    .width(Length::FillPortion(1)),
+                                                container(text(format!("{:.3}", &n.3)))
+                                                    .width(Length::FillPortion(1)),
+                                            ]
                                             .width(Length::Fill),
                                         )
-                                    }
-                                )))
+                                        .width(Length::Fill),
+                                    )
+                                })))
                             ]
                             .spacing(5)
                             .into()
