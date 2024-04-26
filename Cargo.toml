@@ -14,9 +14,9 @@ rfd = {version = "0.11.4"}
 directories = "5.0.1"
 serde_json = "1.0.104"
 serde = { version = "1.0.188", features = ["serde_derive"] }
-reqwest = { version = "0.11", features = ["json", "blocking"] }
 rmp-serde = "1.1.2"
 color-eyre = { version = "0.6.3", default-features = false }
+minreq = {version = "2.11.2", features = ["https-rustls", "json-using-serde"] }
 
 [profile.dev.package.keycat]
 opt-level = 3
