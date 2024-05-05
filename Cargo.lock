@@ -1556,7 +1556,7 @@ dependencies = [
 [[package]]
 name = "keymeow"
 version = "0.1.0"
-source = "git+https://github.com/semilin/keymeow#6f1a014fcf3fb0944c17e3afc4eee29e0cac908e"
+source = "git+https://github.com/semilin/keymeow#23dc7526cf792784e0b2cbf043b87c7537199096"
 dependencies = [
  "keycat",
  "serde",
