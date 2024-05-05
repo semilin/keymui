@@ -67,7 +67,7 @@ impl fmt::Display for KeymuiTheme {
             f,
             "{}",
             match self {
-		Self::Light => "Light",
+                Self::Light => "Light",
                 Self::Dark => "Dark",
                 Self::TokyoNight => "Tokyo Night",
                 Self::CatppuccinMocha => "Catpuccin Mocha",
@@ -96,7 +96,7 @@ pub struct MetricDisplayConfig {
 impl Default for Config {
     fn default() -> Self {
         Config {
-	    metrics_directory: None,
+            metrics_directory: None,
             metric_display_styles: HashMap::from([
                 (
                     "roll".to_string(),
@@ -129,7 +129,7 @@ impl Default for Config {
             ]),
             stat_precision: 1,
             use_monospace: true,
-	    theme: Default::default(),
+            theme: Default::default(),
         }
     }
 }
@@ -496,18 +496,27 @@ impl Application for Keymui {
 
         let top_bar = row![
             container(pick_list(
-                [KeymuiTheme::Light, KeymuiTheme::Dark, KeymuiTheme::TokyoNight, KeymuiTheme::CatppuccinMocha],
+                [
+                    KeymuiTheme::Light,
+                    KeymuiTheme::Dark,
+                    KeymuiTheme::TokyoNight,
+                    KeymuiTheme::CatppuccinMocha
+                ],
                 Some(self.config.theme),
                 Message::SetTheme
             ))
-		.align_x(alignment::Horizontal::Left)
-		.width(Length::Fill),
-            container(notif).align_x(alignment::Horizontal::Right)
-		.width(Length::Fill)
+            .align_x(alignment::Horizontal::Left)
+            .width(Length::Fill),
+            container(notif)
+                .align_x(alignment::Horizontal::Right)
+                .width(Length::Fill)
         ];
 
         let main = column![
-            container(top_bar).height(Length::Fill).width(Length::Fill).align_x(alignment::Horizontal::Right),
+            container(top_bar)
+                .height(Length::Fill)
+                .width(Length::Fill)
+                .align_x(alignment::Horizontal::Right),
             container(pane_grid)
                 .height(Length::FillPortion(10))
                 .width(Length::Fill)
@@ -546,7 +555,7 @@ impl Application for Keymui {
 
     fn theme(&self) -> Theme {
         match self.config.theme {
-	    KeymuiTheme::Light => Theme::Light,
+            KeymuiTheme::Light => Theme::Light,
             KeymuiTheme::Dark => Theme::Dark,
             KeymuiTheme::TokyoNight => Theme::TokyoNight,
             KeymuiTheme::CatppuccinMocha => Theme::CatppuccinMocha,
