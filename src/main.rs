@@ -168,12 +168,13 @@ impl Application for Keymui {
 
         let commands = vec![
             UserCommand::SetMetricsDirectory,
-            UserCommand::ReloadMetrics,
+            UserCommand::Reload,
             UserCommand::ImportCorpus,
             UserCommand::ViewNotification,
             UserCommand::Swap,
             UserCommand::Precision,
             UserCommand::NgramFrequency,
+            UserCommand::SaveLayout,
         ];
 
         let mut keymui = Self {
@@ -528,14 +529,17 @@ impl Application for Keymui {
                 };
                 return text_input::focus::<Message>(text_input::Id::new("cmd"));
             }
-            Message::ReloadMetrics => {
+            Message::Reload => {
                 let result = self.import_metrics();
                 match result {
-                    Ok(()) => self.notification = ("metrics loaded successfully".to_string(), None),
+                    Ok(()) => self.notification = ("reloaded successfully".to_string(), None),
                     Err(e) => self.notification = (e.to_string(), None),
                 }
                 let _ = self.set_metric_list();
                 if let Err(e) = self.load_data() {
+                    println!("{:?}", e);
+                }
+                if let Err(e) = self.load_layouts() {
                     println!("{:?}", e);
                 }
             }
@@ -596,7 +600,7 @@ impl Application for Keymui {
                 self.filter_commands();
             }
             Message::CommandSubmitted => {
-                self.parse_command();
+                self.parse_command().unwrap();
             }
             Message::ViewNotification => {
                 self.show_notif_modal = true;
@@ -732,7 +736,7 @@ impl Application for Keymui {
 #[derive(Clone, Debug)]
 pub enum Message {
     SetMetricsDirectory,
-    ReloadMetrics,
+    Reload,
     ImportNewCorpus,
     CommandInputChanged(String),
     CommandSubmitted,
