@@ -46,6 +46,7 @@ pub struct LayoutDisplay {
     lowest_y: f32,
     highest_x: f32,
     lowest_x: f32,
+    highest_y: f32,
     pub style: ColorStyle,
     cache: Cache,
 }
@@ -159,6 +160,15 @@ impl LayoutDisplay {
             .min()
             .unwrap() as f32
             / 100.0;
+        let highest_y = kb
+            .keys
+            .map
+            .iter()
+            .flatten()
+            .map(|kc| (kc.y * 100.0).ceil() as i32)
+            .max()
+            .unwrap() as f32
+            / 100.0;
         let highest_x = kb
             .keys
             .map
@@ -181,6 +191,7 @@ impl LayoutDisplay {
         Self {
             keys: Self::keys(ctx, style, metric),
             lowest_y,
+            highest_y,
             highest_x,
             lowest_x,
             style: ColorStyle::Frequency,
@@ -205,9 +216,12 @@ impl canvas::Program<Message> for LayoutDisplay {
         _cursor: mouse::Cursor,
     ) -> Vec<Geometry> {
         let width = 1.0 + self.highest_x - self.lowest_x;
-        let provided = (0.95 * bounds.width).min(500.0);
-        let offset = (bounds.width - provided) / 2.0;
-        let scale = provided / width;
+        let height = 1.0 + self.highest_y - self.lowest_y;
+        let width_provided = (0.95 * bounds.width).min(500.0);
+        let height_provided = (0.95 * bounds.height).min(500.0);
+        let x_offset = (bounds.width - width_provided) / 2.0;
+        let y_offset = (bounds.height - height_provided) / 2.0;
+        let scale = (width_provided / width).min(height_provided / height); 
         let key_size = scale * 0.9;
 
         let display = self.cache.draw(renderer, bounds.size(), |frame| {
@@ -233,7 +247,7 @@ impl canvas::Program<Message> for LayoutDisplay {
                     ColorStyle::Fingers => color_from_finger(key.finger),
                 };
                 frame.fill_rectangle(
-                    Point::new(offset + scale * key.x, scale * (key.y - self.lowest_y)),
+                    Point::new(x_offset + scale * key.x, y_offset + scale * key.y),
                     Size::new(key_size, key_size),
                     color,
                 );
@@ -243,8 +257,8 @@ impl canvas::Program<Message> for LayoutDisplay {
                         '\0' => "".to_string(),
                         _ => data.letter.to_string(),
                     });
-                    let bx = offset + key.x * scale;
-                    let by = (key.y - self.lowest_y) * scale;
+                    let bx = x_offset + key.x * scale;
+                    let by = y_offset + key.y * scale;
                     text.position =
                         Point::new((2.0 * bx + key_size) / 2.0, (2.0 * by + key_size) / 2.0);
                     text.horizontal_alignment = Horizontal::Center;
