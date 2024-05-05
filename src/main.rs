@@ -3,6 +3,7 @@ mod download;
 mod layout_display;
 mod logic;
 use commands::{commonest_completion, UserCommand};
+use core::fmt;
 use directories::BaseDirs;
 use iced::event::{self, Event};
 use iced::theme;
@@ -51,6 +52,30 @@ pub enum NstrokeSortMethod {
     Value,
 }
 
+#[derive(Serialize, Deserialize, Debug, Default, Copy, Clone, PartialEq, Eq)]
+pub enum KeymuiTheme {
+    Light,
+    Dark,
+    #[default]
+    TokyoNight,
+    CatppuccinMocha,
+}
+
+impl fmt::Display for KeymuiTheme {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+		Self::Light => "Light",
+                Self::Dark => "Dark",
+                Self::TokyoNight => "Tokyo Night",
+                Self::CatppuccinMocha => "Catpuccin Mocha",
+            }
+        )
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
@@ -58,6 +83,7 @@ pub struct Config {
     metric_display_styles: HashMap<String, MetricDisplayConfig>,
     stat_precision: u32,
     use_monospace: bool,
+    theme: KeymuiTheme,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -70,7 +96,7 @@ pub struct MetricDisplayConfig {
 impl Default for Config {
     fn default() -> Self {
         Config {
-            metrics_directory: None,
+	    metrics_directory: None,
             metric_display_styles: HashMap::from([
                 (
                     "roll".to_string(),
@@ -103,6 +129,7 @@ impl Default for Config {
             ]),
             stat_precision: 1,
             use_monospace: true,
+	    theme: Default::default(),
         }
     }
 }
@@ -460,18 +487,27 @@ impl Application for Keymui {
         .align_y(alignment::Vertical::Bottom);
 
         let input = column![cmd_col, cmd_input];
-        let notif = row![text(&self.notification.0)];
+        let notif: iced::widget::Row<_> = row![text(&self.notification.0)];
         let notif = if self.notification.1.is_some() {
             notif.push(button("info").on_press(Message::ViewNotification))
         } else {
             notif
         };
 
+        let top_bar = row![
+            container(pick_list(
+                [KeymuiTheme::Light, KeymuiTheme::Dark, KeymuiTheme::TokyoNight, KeymuiTheme::CatppuccinMocha],
+                Some(self.config.theme),
+                Message::SetTheme
+            ))
+		.align_x(alignment::Horizontal::Left)
+		.width(Length::Fill),
+            container(notif).align_x(alignment::Horizontal::Right)
+		.width(Length::Fill)
+        ];
+
         let main = column![
-            container(notif)
-                .height(Length::Fill)
-                .width(Length::Fill)
-                .align_x(alignment::Horizontal::Right),
+            container(top_bar).height(Length::Fill).width(Length::Fill).align_x(alignment::Horizontal::Right),
             container(pane_grid)
                 .height(Length::FillPortion(10))
                 .width(Length::Fill)
@@ -509,7 +545,12 @@ impl Application for Keymui {
     }
 
     fn theme(&self) -> Theme {
-        Theme::Dark
+        match self.config.theme {
+	    KeymuiTheme::Light => Theme::Light,
+            KeymuiTheme::Dark => Theme::Dark,
+            KeymuiTheme::TokyoNight => Theme::TokyoNight,
+            KeymuiTheme::CatppuccinMocha => Theme::CatppuccinMocha,
+        }
     }
 
     fn subscription(&self) -> Subscription<Message> {
@@ -727,6 +768,9 @@ impl Application for Keymui {
                     display.redraw();
                 }
             }
+            Message::SetTheme(theme) => {
+                self.config.theme = theme;
+            }
         }
 
         Command::none()
@@ -749,6 +793,7 @@ pub enum Message {
     Resized(pane_grid::ResizeEvent),
     SwapKeys(char, char),
     SetPrecision(u32),
+    SetTheme(KeymuiTheme),
     ToggleDisplayStyle(String),
     ToggleSortMethod(String),
     SetNstrokesMetric(usize),
