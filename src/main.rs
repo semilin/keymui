@@ -313,20 +313,25 @@ impl Application for Keymui {
                                                                     context.layout.matrix[*i],
                                                                 )
                                                         })
+                                                        .map(|c| match c {
+                                                            ' ' => '␣',
+                                                            _ => c,
+                                                        })
                                                         .collect::<String>(),
                                                 )
                                                 .font(self.monospaced_font())
                                                 .width(Length::Fill),
                                                 text({
-                                                    let mut c =
+                                                    let c =
                                                         context.analyzer.corpus.uncorpus_unigram(
                                                             context.layout.matrix
                                                                 [self.keyboard_size + idx],
                                                         );
-                                                    if c == '\0' {
-                                                        c = ' ';
+                                                    match c {
+                                                        '\0' => '�',
+                                                        ' ' => '␣',
+                                                        _ => c
                                                     }
-                                                    c
                                                 })
                                                 .font(self.monospaced_font())
                                                 .width(Length::Fill)
