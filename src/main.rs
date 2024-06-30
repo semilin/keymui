@@ -310,7 +310,7 @@ impl Application for Keymui {
                                                                 .analyzer
                                                                 .corpus
                                                                 .uncorpus_unigram(
-                                                                    context.layout.matrix[*i],
+                                                                    context.layout.0[*i],
                                                                 )
                                                         })
                                                         .map(|c| match c {
@@ -324,7 +324,7 @@ impl Application for Keymui {
                                                 text({
                                                     let c =
                                                         context.analyzer.corpus.uncorpus_unigram(
-                                                            context.layout.matrix
+                                                            context.layout.0
                                                                 [self.keyboard_size + idx],
                                                         );
                                                     match c {
@@ -692,12 +692,12 @@ impl Application for Keymui {
                 if let Some(ctx) = &mut self.metric_context {
                     let a = ctx
                         .layout
-                        .matrix
+                        .0
                         .iter()
                         .position(|c| *c == ctx.analyzer.corpus.corpus_char(a));
                     let b = ctx
                         .layout
-                        .matrix
+                        .0
                         .iter()
                         .position(|c| *c == ctx.analyzer.corpus.corpus_char(b));
                     if let (Some(a), Some(b)) = (a, b) {

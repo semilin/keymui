@@ -79,14 +79,14 @@ impl LayoutDisplay {
         let corpus = &ctx.analyzer.corpus;
         let freqs: Vec<f32> = match style {
             ColorStyle::Frequency => {
-                let max_freq = l.matrix.iter().map(|c| corpus.chars[*c]).max().unwrap();
-                l.matrix
+                let max_freq = l.0.iter().map(|c| corpus.chars[*c]).max().unwrap();
+                l.0
                     .iter()
                     .map(|c| 0.3 + (1.0 + corpus.chars[*c] as f32 / (max_freq as f32 - 0.3)).log2())
                     .collect()
             }
             ColorStyle::Metric => {
-                let counts: Vec<f32> = (0..ctx.layout.matrix.len())
+                let counts: Vec<f32> = (0..ctx.layout.0.len())
                     .map(|p| {
                         let sum: f32 = ctx
                             .analyzer
@@ -123,13 +123,13 @@ impl LayoutDisplay {
                     .map(|x| 0.2 + (1.0 + x / (*max_freq - 0.2)).log2())
                     .collect()
             }
-            _ => vec![0.0; l.matrix.len()],
+            _ => vec![0.0; l.0.len()],
         };
         kb.keys
             .map
             .iter()
             .flatten()
-            .zip(l.matrix.iter())
+            .zip(l.0.iter())
             .enumerate()
             .map(|(i, (kc, c))| {
                 (
